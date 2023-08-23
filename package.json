@@ -1,6 +1,6 @@
 {
   "name": "@quazardous/quarkernel",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "description": "Micro Custom Events Kernel",
   "repository": {
@@ -10,7 +10,7 @@
   "main": "index.js",
   "files": [
     "index.js",
-    "src/lib/",
+    "lib/lib/",
     "types/"
   ],
   "typings": "./types/QuarKernel.d.ts",
