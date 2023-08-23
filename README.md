@@ -14,7 +14,7 @@ Helps structuring your app with events.
 
 ## Basic usage
 
-Define event listeners across your app components with dependency support.  
+Define event listeners across your app modules with dependency support.  
 Share context between components.  
 
 ```js
@@ -28,17 +28,19 @@ qk.addEventListener('my_event', (e) => {
     notNeeded();
 });
 
+// your module foo does some init stuff
 qk.addEventListener('my_event', async (e) => {
     // something async
     e.context.needed = await needed();
 }, 'foo');
 
-// somewhere else in your app you can wait after foo to set a specific context
+// somewhere else in your app your module bar is waitint after foo to set a specific context
 qk.addEventListener('my_event', (e) => {
     // something after the async callback
     needing(e.context.needed);
 }, 'bar', 'foo');
 
+// call everything
 qk.dispatchEvent(new QKE('my_event')).then(() => {
     // event my_event fully dispatched
     happyEnd();
