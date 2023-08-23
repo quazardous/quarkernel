@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { QuarKernel, QuarKernelEvent as QKE } from '../index.js';
+import { QuarKernel, QuarKernelEvent as QKE } from '../src/index.js';
 
 describe('QuarKernel', () => {
   describe('Main', () => {

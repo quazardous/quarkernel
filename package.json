@@ -1,26 +1,23 @@
 {
   "name": "@quazardous/quarkernel",
-  "version": "1.0.5",
+  "version": "1.0.9",
   "type": "module",
   "description": "Micro Custom Events Kernel",
   "repository": {
     "type": "git",
     "url": "https://github.com/quazardous/quarkernel.git"
   },
-  "main": "index.js",
+  "module": "src/index.js",
+  "main": "src/index.js",
   "files": [
-    "lib/",
+    "src/",
     "types/"
   ],
   "typings": "./types/QuarKernel.d.ts",
   "scripts": {
-    "build": "npx babel src -d lib",
-    "prepare": "npm run build && npm run gen-typings",
+    "prepare": "npm run gen-typings",
     "test": "mocha tests/",
     "gen-typings": "npx -p typescript tsc src/lib/*.js --declaration --allowJs --emitDeclarationOnly --outDir types"
-  },
-  "babel": {
-    "presets": ["@babel/preset-env"]
   },
   "keywords": [
     "event",
@@ -30,14 +27,12 @@
   "author": "quazardous <berliozdavid@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "@babel/cli": "^7.0.0",
-    "@babel/core": "^7.21.3",
-    "@babel/plugin-transform-runtime": "^7.21.0",
-    "@babel/preset-env": "^7.0.0",
-    "@babel/register": "^7.21.0",
+    "@babel/register": "^7.22.5",
     "chai": "^4.3.7",
     "core-js": "^3.29.1",
-    "mocha": "^9.2.0",
+    "mocha": "^9.2.0"
+  },
+  "dependencies": {
     "toposort": "^2.0.2"
   }
 }
