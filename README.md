@@ -6,11 +6,16 @@ Micro Custom Event Kernel.
 
 Helps structuring your app with events.
 
-- ES6
-- Async() support with Promise
-- Event scope dependency support
-- Composite event
-- Shared context
+- Modern: ES6, Async() support with Promise
+- Dependency support: easily handle async resource dependencies
+- Composite event: handle complex logic with a common event pipe
+- Shared context: use event data to share variable
+
+## Install
+
+```bash
+npm i "@quazardous/quarkernel"
+```
 
 ## Basic usage
 
