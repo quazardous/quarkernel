@@ -18,7 +18,7 @@ Define event listeners across your app modules with dependency support.
 Share context between components.  
 
 ```js
-import { QuarKernel, QuarKernelEvent as QKE } from 'quarkernel';
+import { QuarKernel, QuarKernelEvent as QKE } from '@quazardous/quarkernel';
 
 // singleton
 const qk = new QuarKernel();
