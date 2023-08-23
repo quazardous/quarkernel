@@ -1,16 +1,15 @@
 {
   "name": "@quazardous/quarkernel",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "description": "Micro Custom Events Kernel",
   "repository": {
     "type": "git",
     "url": "https://github.com/quazardous/quarkernel.git"
   },
-  "main": "index.js",
+  "main": "lib/index.js",
   "files": [
-    "index.js",
-    "lib/lib/",
+    "lib/",
     "types/"
   ],
   "typings": "./types/QuarKernel.d.ts",
@@ -18,7 +17,7 @@
     "build": "npx babel src -d lib",
     "prepare": "npm run build && npm run gen-typings",
     "test": "mocha tests/",
-    "gen-typings": "npx -p typescript tsc src/**/*.js --declaration --allowJs --emitDeclarationOnly --outDir types"
+    "gen-typings": "npx -p typescript tsc src/lib/*.js --declaration --allowJs --emitDeclarationOnly --outDir types"
   },
   "babel": {
     "presets": ["@babel/preset-env"]
