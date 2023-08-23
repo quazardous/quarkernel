@@ -1,13 +1,13 @@
 {
   "name": "@quazardous/quarkernel",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "description": "Micro Custom Events Kernel",
   "repository": {
     "type": "git",
     "url": "https://github.com/quazardous/quarkernel.git"
   },
-  "main": "lib/index.js",
+  "main": "index.js",
   "files": [
     "lib/",
     "types/"

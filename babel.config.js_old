@@ -1,6 +1,0 @@
-// export const presets = [
-//   ['@babel/preset-env', {
-//     "corejs": "3.29",
-//     "useBuiltIns": "usage"
-//   }],
-// ];
