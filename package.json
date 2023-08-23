@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Micro Custom Events Kernel",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/quazardous/quarkernel.git"
+  },
   "main": "index.js",
   "files": [
     "index.js",
