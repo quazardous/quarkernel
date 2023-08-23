@@ -34,7 +34,7 @@ qk.addEventListener('my_event', async (e) => {
     e.context.needed = await needed();
 }, 'foo');
 
-// somewhere else in your app your module bar is waitint after foo to set a specific context
+// somewhere else in your app your module bar is waiting after foo to set a specific context
 qk.addEventListener('my_event', (e) => {
     // something after the async callback
     needing(e.context.needed);
