@@ -57,13 +57,13 @@ class GraphNodeProcessor {
   processAll(e) {
     return Promise.all(
       this.nodes.map(n => this.process(n, e))
-    );
+    ).then(() => e);
   }
 
   /**
    * @param  {GraphNode} node 
    * @param  {QuarKernelEvent} e
-   * @return {Promise<QuarKernelEvent>} 
+   * @return {Promise<*>} 
    * @private
    */
   process(node, e) {
@@ -81,7 +81,7 @@ class GraphNodeProcessor {
       }
       process.promise = this.processDependencies(node, e).then(then);
     }
-    return process.promise.then(() => e);
+    return process.promise;
   }
 
   /**
