@@ -21,25 +21,25 @@ describe('QuarKernel', () => {
       console.log('init', qk);
 
       qk.addEventListener(qkEvents.FOO, (e, target) => {
-        console.log(`TRIGGER Event: ${qkEvents.FOO}`);
+        console.log(`TRIGGER Event: ${qkEvents.FOO}, Target: ${target}`);
         e.context.foo = 1;
         e.context.stack.push(target);
       });
       qk.addEventListener(qkEvents.FOO, async (e, target) => {
         await sleep(1000);
-        console.log(`delayed TRIGGER Event: ${qkEvents.FOO}`);
+        console.log(`delayed TRIGGER Event: ${qkEvents.FOO}, Target: ${target}`);
         e.context.stack.push(target);
       });
 
       const sleep = m => new Promise(r => setTimeout(r, m));
       qk.addEventListener(qkEvents.FOO, async (e, target) => {
-        console.log(`TRIGGER[${qkTargets.ZERO}] Event: ${qkEvents.FOO} -> timeout`);
+        console.log(`TRIGGER[${qkTargets.ZERO}] Event: ${qkEvents.FOO}, Target: ${target} -> timeout`);
         await sleep(2000);
         console.log(`TRIGGER[${qkTargets.ZERO}] Event: ${qkEvents.FOO} -> done`);
         e.context.stack.push(target);
       }, qkTargets.ZERO);
       qk.addEventListener(qkEvents.FOO, (e, target) => {
-        console.log(`TRIGGER[${qkTargets.ONE}] Event: ${qkEvents.FOO}`);
+        console.log(`TRIGGER[${qkTargets.ONE}] Event: ${qkEvents.FOO}, Target: ${target}`);
         console.log(`Waited after ${qkTargets.ZERO}.${qkEvents.FOO} ?`);
         console.log(e);
         e.context.stack.push(target);
@@ -55,9 +55,9 @@ describe('QuarKernel', () => {
       });
 
       console.log('just before');
-      qk.dispatchEvent(new QKE(qkEvents.BAR));
+      qk.dispatchEvent(new QKE(qkEvents.BAR)).then((e) => { console.log('bar: ', e); });
       const context = { stack: [] };
-      await qk.dispatchEvent(new QKE(qkEvents.FOO, 'something', context));
+      await qk.dispatchEvent(new QKE(qkEvents.FOO, 'something', context)).then((e) => { console.log('foo: ', e); });
       console.log('just after', context.stack);
       expect(context.stack).to.eql(['.auto.0', '.auto.1', 'zero', 'one']);
     }).timeout(3000);

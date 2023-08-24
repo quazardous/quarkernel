@@ -46,7 +46,7 @@ qk.addEventListener('my_event', (e) => {
 }, 'bar', 'foo');
 
 // call everything
-qk.dispatchEvent(new QKE('my_event')).then(() => {
+qk.dispatchEvent(new QKE('my_event')).then((e) => {
     // event my_event fully dispatched
     happyEnd();
 });

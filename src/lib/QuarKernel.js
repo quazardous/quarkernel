@@ -2,10 +2,28 @@
 import toposort from 'toposort';
 
 class GraphNode {
+  /**
+   * @param {string} target 
+   * @param {string} name 
+   * @param {Array<string>} requires 
+   * @param {eventListenerCallback|async eventListenerCallback} callback 
+   */
   constructor(target, name, requires, callback) {
+    /**
+     * @type {string}
+     */
     this.target = target;
+    /**
+     * @type {string}
+     */
     this.name = name;
+    /**
+     * @type {Array<string>}
+     */
     this.requires = requires;
+    /**
+     * @type {eventListenerCallback|async eventListenerCallback}
+     */
     this.callback = callback;
   }
 }
@@ -15,7 +33,13 @@ class GraphNodeProcessor {
    * @param {Array<GraphNode>} nodes 
    */
   constructor(nodes) {
+    /**
+     * @type {Object.<string, {promise:Promise<QuarKernelEvent>|null,node:GraphNode}>}
+     */
     this.processMap = {};
+    /**
+     * @type {Array<GraphNode>} nodes 
+     */
     this.nodes = nodes;
     nodes.forEach(n => {
       this.processMap[n.name] = {
@@ -25,35 +49,53 @@ class GraphNodeProcessor {
     });
   }
 
-  processAll(...args) {
+  /**
+   * @param  {QuarKernelEvent} e
+   * @return {Promise<QuarKernelEvent>}
+   * @private
+   */
+  processAll(e) {
     return Promise.all(
-      this.nodes.map(n => this.process(n, ...args))
+      this.nodes.map(n => this.process(n, e))
     );
   }
 
-  process(node, ...args) {
+  /**
+   * @param  {GraphNode} node 
+   * @param  {QuarKernelEvent} e
+   * @return {Promise<QuarKernelEvent>} 
+   * @private
+   */
+  process(node, e) {
     const process = this.processMap[node.name];
     if (!process.promise) {
       let then = null;
       if (node.callback.constructor.name === 'AsyncFunction') {
         // handle async
-        then = () => node.callback(...args, node.target);
+        then = () => node.callback(e, node.target);
       } else {
         then = () => new Promise((resolve) => {
-          resolve(node.callback(...args, node.target));
+          node.callback(e, node.target);
+          resolve();
         });
       }
-      process.promise = this.processDependencies(node, ...args).then(then);
+      process.promise = this.processDependencies(node, e).then(then);
     }
-    return process.promise;
+    return process.promise.then(() => e);
   }
 
-  processDependencies(node, ...args) {
+  /**
+   * @param  {GraphNode} node 
+   * @param  {QuarKernelEvent} e
+   * @return {Promise<*>} 
+   * @private
+   */
+  processDependencies(node, e) {
     if (node.requires.length) {
       const promises = [];
       this.nodes.forEach(n => {
         if (node.requires.includes(n.target)) {
-          promises.push(this.process(n, ...args));
+          promises.push(this.process(n, e));
         }
       });
       return Promise.all(promises);
@@ -94,7 +136,7 @@ class CompositeTrigger {
     this.callback = callback;
     this.reset = reset;
     /**
-     * @type {Object.<string, Array<{e:QuarKernelEvent,p:Promise<*>}>>}
+     * @type {Object.<string, Array<{e:QuarKernelEvent,p:Promise<QuarKernelEvent>}>>}
      */
     this.eventPromiseStack = {};
   }
@@ -103,6 +145,7 @@ class CompositeTrigger {
    * @param {QuarKernelEvent} e 
    * @param {Promise<*>} p
    * @return {Promise<*>|null}
+   * @private
    */
   compose(e, p) {
     if (!this.components.includes(e.type)) {
@@ -136,8 +179,13 @@ class CompositeTrigger {
 }
 
 /**
+ * @callback eventListenerCallback
+ * @param {QuarKernelEvent} [e]
+ */
+
+/**
  * @callback composeTriggerCallback
- * @param {Object.<string, Array<{e:QuarKernelEvent,p:Promise<*>}>>} [stack] Stack of components events/promises
+ * @param {Object.<string, Array<{e:QuarKernelEvent,p:Promise<QuarKernelEvent>}>>} [stack] Stack of components events/promises
  */
 
 /**
@@ -260,8 +308,8 @@ class QuarKernel {
 
   /**
    * @param {QuarKernelEvent} e 
-   * @param {Promise<*>} p
-   * @return {Promise<*>}
+   * @param {Promise<QuarKernelEvent>} p
+   * @return {Promise<QuarKernelEvent>}
    * @private
    */
   composeTrigger(e, p) {
@@ -273,7 +321,7 @@ class QuarKernel {
       }
     });
     if (list.length > 0) {
-      p = p.then(() => Promise.all(list))
+      p = p.then(() => Promise.all(list).then(() => e))
     }
     return p;
   }
@@ -282,7 +330,7 @@ class QuarKernel {
    * Dispatch an event.
    *
    * @param {QuarKernelEvent} e The event
-   * @return {Promise<*>}
+   * @return {Promise<QuarKernelEvent>}
    */
   dispatchEvent(e) {
     if (!(e instanceof QuarKernelEvent)) {
@@ -290,7 +338,7 @@ class QuarKernel {
     }
     if (typeof this.callbacks[e.type] === 'undefined') {
       // no callback registered
-      return this.composeTrigger(e, Promise.resolve());
+      return this.composeTrigger(e, Promise.resolve(e));
     }
     if (typeof this.seqGraph[e.type] !== 'undefined') {
       // using toposort to early detect dependencies loop
