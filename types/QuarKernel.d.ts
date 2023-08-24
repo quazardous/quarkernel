@@ -1,7 +1,8 @@
+export type eventListenerCallback = (e?: QuarKernelEvent) => any;
 export type composeTriggerCallback = (stack?: {
     [x: string]: Array<{
         e: QuarKernelEvent;
-        p: Promise<any>;
+        p: Promise<QuarKernelEvent>;
     }>;
 }) => any;
 export type composeEventFactory = (stack?: {
@@ -10,8 +11,12 @@ export type composeEventFactory = (stack?: {
 export type eventCallback = (e?: QuarKernelEvent, target?: string) => any;
 export type eventAsyncCallback = () => any;
 /**
+ * @callback eventListenerCallback
+ * @param {QuarKernelEvent} [e]
+ */
+/**
  * @callback composeTriggerCallback
- * @param {Object.<string, Array<{e:QuarKernelEvent,p:Promise<*>}>>} [stack] Stack of components events/promises
+ * @param {Object.<string, Array<{e:QuarKernelEvent,p:Promise<QuarKernelEvent>}>>} [stack] Stack of components events/promises
  */
 /**
  * @callback composeEventFactory
@@ -84,8 +89,8 @@ export class QuarKernel {
     addCompositeEvent(components: Array<string>, factory: composeEventFactory, reset?: boolean): void;
     /**
      * @param {QuarKernelEvent} e
-     * @param {Promise<*>} p
-     * @return {Promise<*>}
+     * @param {Promise<QuarKernelEvent>} p
+     * @return {Promise<QuarKernelEvent>}
      * @private
      */
     private composeTrigger;
@@ -93,9 +98,9 @@ export class QuarKernel {
      * Dispatch an event.
      *
      * @param {QuarKernelEvent} e The event
-     * @return {Promise<*>}
+     * @return {Promise<QuarKernelEvent>}
      */
-    dispatchEvent(e: QuarKernelEvent): Promise<any>;
+    dispatchEvent(e: QuarKernelEvent): Promise<QuarKernelEvent>;
     /**
      * @param {string} type
      * @param {string} target
