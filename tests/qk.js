@@ -1,5 +1,9 @@
 import { expect } from 'chai';
-import { QuarKernel, QuarKernelEvent as QKE } from '../src/index.js';
+import {
+  QuarKernel,
+  QuarKernelEvent as QKE,
+  QuarKernelLegacyAsyncFunctionWrapper as QKAsync
+} from '../src/index.js';
 
 describe('QuarKernel', () => {
   describe('Main', () => {
@@ -32,12 +36,12 @@ describe('QuarKernel', () => {
       });
 
       const sleep = m => new Promise(r => setTimeout(r, m));
-      qk.addEventListener(qkEvents.FOO, async (e, target) => {
+      qk.addEventListener(qkEvents.FOO, new QKAsync(async (e, target) => {
         console.log(`TRIGGER[${qkTargets.ZERO}] Event: ${qkEvents.FOO}, Target: ${target} -> timeout`);
         await sleep(2000);
         console.log(`TRIGGER[${qkTargets.ZERO}] Event: ${qkEvents.FOO} -> done`);
         e.context.stack.push(target);
-      }, qkTargets.ZERO);
+      }), qkTargets.ZERO);
       qk.addEventListener(qkEvents.FOO, (e, target) => {
         console.log(`TRIGGER[${qkTargets.ONE}] Event: ${qkEvents.FOO}, Target: ${target}`);
         console.log(`Waited after ${qkTargets.ZERO}.${qkEvents.FOO} ?`);

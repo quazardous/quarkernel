@@ -1,6 +1,6 @@
 {
   "name": "@quazardous/quarkernel",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "type": "module",
   "description": "Micro Custom Events Kernel",
   "repository": {

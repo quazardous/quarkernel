@@ -1,12 +1,12 @@
 export type eventListenerCallback = (e?: QuarKernelEvent) => any;
 export type composeTriggerCallback = (stack?: {
-    [x: string]: Array<{
+    [x: string]: {
         e: QuarKernelEvent;
         p: Promise<QuarKernelEvent>;
-    }>;
+    }[];
 }) => any;
 export type composeEventFactory = (stack?: {
-    [x: string]: Array<QuarKernelEvent>;
+    [x: string]: QuarKernelEvent[];
 }) => QuarKernelEvent;
 export type eventCallback = (e?: QuarKernelEvent, target?: string) => any;
 export type eventAsyncCallback = () => any;
@@ -67,12 +67,12 @@ export class QuarKernel {
      * Register for some event.
      *
      * @param {string} type Type of event to listen to
-     * @param {eventCallback|eventAsyncCallback} callback
+     * @param {eventCallback|eventAsyncCallback|QuarKernelLegacyAsyncFunctionWrapper} callback
      * @param {string} [target] A unique code for the target listener
      * @param {string|Array<string>} [dependencies] A list of targets dependencies
      * In the event scope, callbacks will be fired according to dependencies
      */
-    addEventListener(type: string, callback: eventCallback | eventAsyncCallback, target?: string, dependencies?: string | Array<string>): void;
+    addEventListener(type: string, callback: eventCallback | eventAsyncCallback | QuarKernelLegacyAsyncFunctionWrapper, target?: string, dependencies?: string | Array<string>): void;
     /**
      * Create a composite trigger.
      *
@@ -119,4 +119,14 @@ export class QuarKernelEvent {
     type: string;
     param: any;
     context: any;
+}
+/**
+ * @class LegacyAsync provides a way to handle async eventListenerCallback for old stacks
+ */
+export class QuarKernelLegacyAsyncFunctionWrapper {
+    /**
+     * @param {async eventListenerCallback} asyncCallback
+     */
+    constructor(asyncCallback: any);
+    asyncCallback: any;
 }

@@ -1,6 +1,18 @@
 /* eslint-disable no-plusplus */
 import toposort from 'toposort';
 
+/**
+ * @class LegacyAsync provides a way to handle async eventListenerCallback for old stacks
+ */
+class QuarKernelLegacyAsyncFunctionWrapper {
+  /**
+   * @param {async eventListenerCallback} asyncCallback 
+   */
+  constructor(asyncCallback) {
+    this.asyncCallback = asyncCallback;
+  }
+}
+
 class GraphNode {
   /**
    * @param {string} target 
@@ -70,7 +82,10 @@ class GraphNodeProcessor {
     const process = this.processMap[node.name];
     if (!process.promise) {
       let then = null;
-      if (node.callback.constructor.name === 'AsyncFunction') {
+      if (node.callback instanceof QuarKernelLegacyAsyncFunctionWrapper) {
+        // handle legacy async
+        then = () => node.callback.asyncCallback(e, node.target);
+      } else if (node.callback.constructor.name === 'AsyncFunction') {
         // handle async
         then = () => node.callback(e, node.target);
       } else {
@@ -242,7 +257,7 @@ class QuarKernel {
    * Register for some event.
    *
    * @param {string} type Type of event to listen to
-   * @param {eventCallback|eventAsyncCallback} callback
+   * @param {eventCallback|eventAsyncCallback|QuarKernelLegacyAsyncFunctionWrapper} callback
    * @param {string} [target] A unique code for the target listener
    * @param {string|Array<string>} [dependencies] A list of targets dependencies
    * In the event scope, callbacks will be fired according to dependencies
@@ -387,4 +402,4 @@ class QuarKernel {
   }
 }
 
-export { QuarKernel, QuarKernelEvent };
+export { QuarKernel, QuarKernelEvent, QuarKernelLegacyAsyncFunctionWrapper };

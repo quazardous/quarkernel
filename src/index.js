@@ -1,3 +1,3 @@
-import { QuarKernel, QuarKernelEvent } from './lib/QuarKernel.js';
+import { QuarKernel, QuarKernelEvent, QuarKernelLegacyAsyncFunctionWrapper } from './lib/QuarKernel.js';
 
-export { QuarKernel, QuarKernelEvent };
+export { QuarKernel, QuarKernelEvent, QuarKernelLegacyAsyncFunctionWrapper };
