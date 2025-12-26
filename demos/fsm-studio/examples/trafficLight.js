@@ -1,15 +1,25 @@
 /**
- * Traffic Light - FSM Behaviors
+ * Traffic Light - State-centric FSM
  */
 export default {
-  onEnter: {
-    green: (ctx, { log }) => log('GREEN'),
-    yellow: (ctx, { log }) => log('YELLOW'),
-    red: (ctx, { log }) => log('RED'),
-  },
-  timers: {
-    green: { send: 'TIMER', delay: 3000 },
-    yellow: { send: 'TIMER', delay: 1000 },
-    red: { send: 'TIMER', delay: 2000 },
+  id: 'trafficLight',
+  initial: 'green',
+  context: {},
+  states: {
+    green: {
+      entry: (ctx, { log }) => log('GREEN'),
+      after: { delay: 3000, send: 'TIMER' },
+      on: { TIMER: 'yellow' },
+    },
+    yellow: {
+      entry: (ctx, { log }) => log('YELLOW'),
+      after: { delay: 1000, send: 'TIMER' },
+      on: { TIMER: 'red' },
+    },
+    red: {
+      entry: (ctx, { log }) => log('RED'),
+      after: { delay: 2000, send: 'TIMER' },
+      on: { TIMER: 'green' },
+    },
   },
 };

@@ -1,17 +1,29 @@
 /**
- * Media Player - FSM Behaviors
+ * Media Player - State-centric FSM
  */
 export default {
-  onEnter: {
-    playing: (ctx, { log }) => {
-      log(`Playing from ${ctx.position}s`);
+  id: 'player',
+  initial: 'stopped',
+  context: { position: 0 },
+  states: {
+    stopped: {
+      entry: (ctx, { set, log }) => {
+        set({ position: 0 });
+        log('Stopped');
+      },
+      on: { PLAY: 'playing' },
     },
-    paused: (ctx, { log }) => {
-      log(`Paused at ${ctx.position}s`);
+    playing: {
+      entry: (ctx, { log }) => {
+        log(`Playing from ${ctx.position}s`);
+      },
+      on: { PAUSE: 'paused', STOP: 'stopped' },
     },
-    stopped: (ctx, { set, log }) => {
-      set({ position: 0 });
-      log('Stopped');
+    paused: {
+      entry: (ctx, { log }) => {
+        log(`Paused at ${ctx.position}s`);
+      },
+      on: { PLAY: 'playing', STOP: 'stopped' },
     },
   },
 };

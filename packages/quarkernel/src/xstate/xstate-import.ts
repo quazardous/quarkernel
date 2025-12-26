@@ -5,7 +5,7 @@
  * Supports basic XState v4/v5 machine structures.
  */
 
-import type { MachineConfig, StateNode, TransitionDef, GuardFunction, ActionFunction } from './types.js';
+import type { MachineConfig, StateNode, TransitionDef, GuardFunction, ActionFunction } from '../fsm/types.js';
 
 /**
  * XState-like state node (simplified)
@@ -192,7 +192,7 @@ export function fromXState<TContext = Record<string, any>>(
       }
 
       if (entryFns.length > 0) {
-        stateNode.onEnter = async (ctx, event, payload) => {
+        stateNode.entry = async (ctx, event, payload) => {
           for (const fn of entryFns) {
             await fn(ctx, event, payload);
           }
@@ -216,7 +216,7 @@ export function fromXState<TContext = Record<string, any>>(
       }
 
       if (exitFns.length > 0) {
-        stateNode.onExit = async (ctx, event, payload) => {
+        stateNode.exit = async (ctx, event, payload) => {
           for (const fn of exitFns) {
             await fn(ctx, event, payload);
           }
@@ -277,12 +277,12 @@ export function toXStateFormat<TContext = any>(
       }
     }
 
-    if (stateNode.onEnter) {
-      xstateNode.entry = { type: 'onEnter' };
+    if (stateNode.entry) {
+      xstateNode.entry = { type: 'entry' };
     }
 
-    if (stateNode.onExit) {
-      xstateNode.exit = { type: 'onExit' };
+    if (stateNode.exit) {
+      xstateNode.exit = { type: 'exit' };
     }
 
     states[stateName] = xstateNode;

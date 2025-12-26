@@ -170,7 +170,7 @@
       }
 
       const comp = new Composition(sources, options);
-      comp.on('composite', () => {
+      comp.onComposed(() => {
         log(name, 'composed', 'event', 'composed!');
         lightUpEvent(name);
         kernel.emit(name);

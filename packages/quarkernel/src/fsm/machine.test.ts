@@ -490,38 +490,38 @@ describe('useMachine', () => {
   });
 
   describe('actions', () => {
-    it('should execute onEnter action', async () => {
-      const onEnter = vi.fn();
+    it('should execute entry action', async () => {
+      const entryAction = vi.fn();
 
       const machine = useMachine(kernel, {
         prefix: 'test',
         initial: 'idle',
         states: {
           idle: { on: { START: 'running' } },
-          running: { onEnter },
+          running: { entry: entryAction },
         },
       });
 
       await machine.send('START');
 
-      expect(onEnter).toHaveBeenCalled();
+      expect(entryAction).toHaveBeenCalled();
     });
 
-    it('should execute onExit action', async () => {
-      const onExit = vi.fn();
+    it('should execute exit action', async () => {
+      const exitAction = vi.fn();
 
       const machine = useMachine(kernel, {
         prefix: 'test',
         initial: 'idle',
         states: {
-          idle: { on: { START: 'running' }, onExit },
+          idle: { on: { START: 'running' }, exit: exitAction },
           running: {},
         },
       });
 
       await machine.send('START');
 
-      expect(onExit).toHaveBeenCalled();
+      expect(exitAction).toHaveBeenCalled();
     });
 
     it('should execute transition actions', async () => {

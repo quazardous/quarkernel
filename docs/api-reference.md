@@ -36,7 +36,7 @@ function createKernel<Events extends EventMap = EventMap>(
 ```
 
 **Parameters:**
-- `options` (optional): Configuration options for the kernel. See [KernelOptions](#kerneloptions).
+- `options` (optional): Configuration options for the qk. See [KernelOptions](#kerneloptions).
 
 **Returns:** A new `Kernel<Events>` instance.
 
@@ -45,7 +45,7 @@ function createKernel<Events extends EventMap = EventMap>(
 import { createKernel } from '@quazardous/quarkernel';
 
 // Basic kernel
-const kernel = createKernel();
+const qk = createKernel();
 
 // Typed kernel
 interface Events {
@@ -96,19 +96,19 @@ on<K extends keyof Events>(
 **Example:**
 ```typescript
 // Basic listener
-const unbind = kernel.on('user:login', async (event, ctx) => {
+const unbind = qk.on('user:login', async (event, ctx) => {
   console.log('User logged in:', event.data.userId);
 });
 
 // With dependencies and priority
-kernel.on('user:login', async (event, ctx) => {
+qk.on('user:login', async (event, ctx) => {
   event.context.user = await fetchUser(event.data.userId);
 }, {
   id: 'fetch-user',
   priority: 10
 });
 
-kernel.on('user:login', async (event, ctx) => {
+qk.on('user:login', async (event, ctx) => {
   console.log('User:', event.context.user.name);
 }, {
   id: 'log-user',
@@ -120,12 +120,12 @@ unbind();
 
 // AbortSignal cleanup
 const controller = new AbortController();
-kernel.on('user:login', handler, { signal: controller.signal });
+qk.on('user:login', handler, { signal: controller.signal });
 controller.abort(); // Removes listener
 
 // Wildcard patterns
-kernel.on('user:*', handler);    // Matches user:login, user:logout, etc.
-kernel.on('**', handler);         // Matches all events
+qk.on('user:*', handler);    // Matches user:login, user:logout, etc.
+qk.on('**', handler);         // Matches all events
 ```
 
 ##### once()
@@ -171,12 +171,12 @@ once<K extends keyof Events>(
 **Example:**
 ```typescript
 // Auto-remove after first call
-kernel.once('app:ready', async (event, ctx) => {
+qk.once('app:ready', async (event, ctx) => {
   console.log('App is ready!');
 });
 
 // Conditional removal (remove after count reaches 3)
-kernel.on('user:login', async (event, ctx) => {
+qk.on('user:login', async (event, ctx) => {
   event.context.count = (event.context.count || 0) + 1;
   console.log('Login count:', event.context.count);
 }, {
@@ -184,7 +184,7 @@ kernel.on('user:login', async (event, ctx) => {
 });
 
 // Promise-based (await first event)
-const event = await kernel.once('user:login');
+const event = await qk.once('user:login');
 console.log('First user login:', event.data);
 ```
 
@@ -209,13 +209,13 @@ off<K extends keyof Events>(
 const handler = async (event, ctx) => { ... };
 
 // Add listener
-kernel.on('user:login', handler);
+qk.on('user:login', handler);
 
 // Remove specific listener
-kernel.off('user:login', handler);
+qk.off('user:login', handler);
 
 // Remove all listeners for event
-kernel.off('user:login');
+qk.off('user:login');
 ```
 
 ##### offAll()
@@ -233,10 +233,10 @@ offAll(event?: keyof Events): void
 **Example:**
 ```typescript
 // Remove all listeners for specific event
-kernel.offAll('user:login');
+qk.offAll('user:login');
 
 // Remove ALL listeners from kernel
-kernel.offAll();
+qk.offAll();
 ```
 
 ##### emit()
@@ -262,17 +262,17 @@ emit<K extends keyof Events>(
 **Example:**
 ```typescript
 // Emit with data
-await kernel.emit('user:login', {
+await qk.emit('user:login', {
   userId: '123',
   timestamp: Date.now()
 });
 
 // Emit without data
-await kernel.emit('app:ready');
+await qk.emit('app:ready');
 
 // Handle errors
 try {
-  await kernel.emit('user:login', data);
+  await qk.emit('user:login', data);
 } catch (error) {
   // AggregateError contains all listener errors
   console.error('Listeners failed:', error.errors);
@@ -300,19 +300,19 @@ emitSerial<K extends keyof Events>(
 **Example:**
 ```typescript
 // Execute listeners one by one
-await kernel.emitSerial('task:process', { taskId: '123' });
+await qk.emitSerial('task:process', { taskId: '123' });
 
 // Useful for async workflows where order matters
-kernel.on('pipeline:run', async (event, ctx) => {
+qk.on('pipeline:run', async (event, ctx) => {
   event.context.step1 = await step1();
 }, { id: 'step1' });
 
-kernel.on('pipeline:run', async (event, ctx) => {
+qk.on('pipeline:run', async (event, ctx) => {
   event.context.step2 = await step2(event.context.step1);
 }, { id: 'step2', after: 'step1' });
 
 // Runs step1, waits for completion, then step2
-await kernel.emitSerial('pipeline:run', { id: 'job-1' });
+await qk.emitSerial('pipeline:run', { id: 'job-1' });
 ```
 
 ##### listenerCount()
@@ -331,13 +331,13 @@ listenerCount(event?: keyof Events): number
 
 **Example:**
 ```typescript
-kernel.on('user:login', handler1);
-kernel.on('user:login', handler2);
-kernel.on('user:logout', handler3);
+qk.on('user:login', handler1);
+qk.on('user:login', handler2);
+qk.on('user:logout', handler3);
 
-console.log(kernel.listenerCount('user:login'));  // 2
-console.log(kernel.listenerCount('user:logout')); // 1
-console.log(kernel.listenerCount());              // 3 (total)
+console.log(qk.listenerCount('user:login'));  // 2
+console.log(qk.listenerCount('user:logout')); // 1
+console.log(qk.listenerCount());              // 3 (total)
 ```
 
 ##### eventNames()
@@ -353,10 +353,10 @@ eventNames(): (keyof Events)[]
 
 **Example:**
 ```typescript
-kernel.on('user:login', handler1);
-kernel.on('user:logout', handler2);
+qk.on('user:login', handler1);
+qk.on('user:logout', handler2);
 
-console.log(kernel.eventNames()); // ['user:login', 'user:logout']
+console.log(qk.eventNames()); // ['user:login', 'user:logout']
 ```
 
 ##### debug()
@@ -373,10 +373,10 @@ debug(enabled: boolean): void
 
 **Example:**
 ```typescript
-kernel.debug(true);  // Enable debug logging
+qk.debug(true);  // Enable debug logging
 // Logs listener execution, timing, errors, etc.
 
-kernel.debug(false); // Disable debug logging
+qk.debug(false); // Disable debug logging
 ```
 
 ##### getExecutionErrors()
@@ -392,15 +392,15 @@ getExecutionErrors(): ReadonlyArray<ExecutionError>
 
 **Example:**
 ```typescript
-const kernel = createKernel({ errorBoundary: true });
+const qk = createKernel({ errorBoundary: true });
 
-kernel.on('task:run', async (event, ctx) => {
+qk.on('task:run', async (event, ctx) => {
   throw new Error('Failed');
 }, { id: 'failing-listener' });
 
-await kernel.emit('task:run', {});
+await qk.emit('task:run', {});
 
-const errors = kernel.getExecutionErrors();
+const errors = qk.getExecutionErrors();
 errors.forEach(err => {
   console.log(`${err.listenerId}: ${err.error.message}`);
 });
@@ -417,8 +417,8 @@ clearExecutionErrors(): void
 
 **Example:**
 ```typescript
-kernel.clearExecutionErrors();
-console.log(kernel.getExecutionErrors()); // []
+qk.clearExecutionErrors();
+console.log(qk.getExecutionErrors()); // []
 ```
 
 ---
@@ -450,7 +450,7 @@ stopPropagation(): void
 
 **Example:**
 ```typescript
-kernel.on('user:login', async (event, ctx) => {
+qk.on('user:login', async (event, ctx) => {
   if (event.data.banned) {
     event.stopPropagation(); // Skip remaining listeners
     return;
@@ -489,7 +489,7 @@ cancel(): void
 
 **Example:**
 ```typescript
-kernel.on('user:login', async (event, ctx) => {
+qk.on('user:login', async (event, ctx) => {
   if (event.data.oneTimeToken) {
     ctx.off(); // Remove self after processing one-time token
   }
@@ -513,7 +513,7 @@ emit<T = any>(eventName: string, data?: T): Promise<void>
 
 **Example:**
 ```typescript
-kernel.on('user:login', async (event, ctx) => {
+qk.on('user:login', async (event, ctx) => {
   await ctx.emit('analytics:track', {
     action: 'login',
     userId: event.data.userId
@@ -534,7 +534,7 @@ stopPropagation(): void
 
 **Example:**
 ```typescript
-kernel.on('user:login', async (event, ctx) => {
+qk.on('user:login', async (event, ctx) => {
   if (event.data.suspended) {
     ctx.stopPropagation(); // Skip remaining listeners
   }
@@ -580,7 +580,7 @@ const composition = Kernel.compose(
 );
 
 // Listen for composite event
-composition.on('composite', async (event, ctx) => {
+composition.onComposed(async (event, ctx) => {
   console.log('All sources ready');
   console.log('Merged context:', event.data.merged);
   console.log('Individual contexts:', event.data.contexts);
@@ -633,7 +633,7 @@ on<K extends keyof Events>(
 
 **Example:**
 ```typescript
-composition.on('composite', async (event, ctx) => {
+composition.onComposed(async (event, ctx) => {
   // event.data.sources: ['user:loaded', 'profile:loaded']
   // event.data.contexts: { 'user:loaded': {...}, 'profile:loaded': {...} }
   // event.data.merged: merged context using configured merger
@@ -722,7 +722,7 @@ getConflicts(): ReadonlyArray<ConflictInfo>
 
 **Example:**
 ```typescript
-composition.on('composite', async (event, ctx) => {
+composition.onComposed(async (event, ctx) => {
   const conflicts = composition.getConflicts();
   conflicts.forEach(conflict => {
     console.warn(`Key "${conflict.key}" conflicts:`, conflict.sources);
@@ -914,7 +914,7 @@ interface MyEvents extends EventMap {
   'data:update': { id: string; value: any };
 }
 
-const kernel = createKernel<MyEvents>();
+const qk = createKernel<MyEvents>();
 ```
 
 ---
@@ -952,7 +952,7 @@ interface KernelOptions {
 
 **Example:**
 ```typescript
-const kernel = createKernel({
+const qk = createKernel({
   delimiter: '.',
   wildcard: true,
   maxListeners: 50,
@@ -995,25 +995,25 @@ interface ListenerOptions {
 **Example:**
 ```typescript
 // Basic options
-kernel.on('user:login', handler, {
+qk.on('user:login', handler, {
   id: 'auth-handler',
   priority: 10
 });
 
 // Dependencies
-kernel.on('user:login', handler, {
+qk.on('user:login', handler, {
   id: 'analytics',
   after: ['auth-handler', 'session-handler']
 });
 
 // Conditional once
-kernel.on('task:run', handler, {
+qk.on('task:run', handler, {
   once: (event) => event.context.attempts >= 3
 });
 
 // AbortSignal
 const controller = new AbortController();
-kernel.on('user:login', handler, {
+qk.on('user:login', handler, {
   signal: controller.signal
 });
 controller.abort(); // Removes listener
@@ -1072,8 +1072,8 @@ Thrown when circular dependencies are detected in listener graph.
 
 **Example:**
 ```typescript
-kernel.on('event', handler1, { id: 'A', after: 'B' });
-kernel.on('event', handler2, { id: 'B', after: 'A' });
+qk.on('event', handler1, { id: 'A', after: 'B' });
+qk.on('event', handler2, { id: 'B', after: 'A' });
 // Throws: CircularDependencyError: Circular dependency detected: A -> B -> A
 ```
 
@@ -1083,8 +1083,8 @@ Thrown when a listener depends on a non-existent listener.
 
 **Example:**
 ```typescript
-kernel.on('event', handler, { id: 'A', after: 'nonexistent' });
-await kernel.emit('event');
+qk.on('event', handler, { id: 'A', after: 'nonexistent' });
+await qk.emit('event');
 // Throws: MissingDependencyError: Listener "A" depends on missing listener "nonexistent"
 ```
 
@@ -1094,10 +1094,10 @@ Warning (not thrown) when listener count exceeds `maxListeners` option.
 
 **Example:**
 ```typescript
-const kernel = createKernel({ maxListeners: 2 });
-kernel.on('event', handler1);
-kernel.on('event', handler2);
-kernel.on('event', handler3);
+const qk = createKernel({ maxListeners: 2 });
+qk.on('event', handler1);
+qk.on('event', handler2);
+qk.on('event', handler3);
 // Console warning: MaxListenersExceeded: Event "event" has 3 listeners (limit: 2)
 ```
 
@@ -1110,9 +1110,9 @@ kernel.on('event', handler3);
 Control execution order with priority (higher = earlier):
 
 ```typescript
-kernel.on('render', handler1, { priority: 10 });  // Runs first
-kernel.on('render', handler2, { priority: 5 });   // Runs second
-kernel.on('render', handler3, { priority: 0 });   // Runs third (default)
+qk.on('render', handler1, { priority: 10 });  // Runs first
+qk.on('render', handler2, { priority: 5 });   // Runs second
+qk.on('render', handler3, { priority: 0 });   // Runs third (default)
 ```
 
 ### Dependency Chains
@@ -1120,10 +1120,10 @@ kernel.on('render', handler3, { priority: 0 });   // Runs third (default)
 Build complex workflows with dependencies:
 
 ```typescript
-kernel.on('pipeline', step1, { id: 'step1' });
-kernel.on('pipeline', step2, { id: 'step2', after: 'step1' });
-kernel.on('pipeline', step3, { id: 'step3', after: 'step2' });
-kernel.on('pipeline', step4, { id: 'step4', after: ['step2', 'step3'] });
+qk.on('pipeline', step1, { id: 'step1' });
+qk.on('pipeline', step2, { id: 'step2', after: 'step1' });
+qk.on('pipeline', step3, { id: 'step3', after: 'step2' });
+qk.on('pipeline', step4, { id: 'step4', after: ['step2', 'step3'] });
 
 // Execution order: step1 → step2 → step3 → step4
 ```
@@ -1133,15 +1133,15 @@ kernel.on('pipeline', step4, { id: 'step4', after: ['step2', 'step3'] });
 Pass data through listener chain:
 
 ```typescript
-kernel.on('user:create', async (event, ctx) => {
+qk.on('user:create', async (event, ctx) => {
   event.context.user = await createUser(event.data);
 }, { id: 'create' });
 
-kernel.on('user:create', async (event, ctx) => {
+qk.on('user:create', async (event, ctx) => {
   event.context.profile = await createProfile(event.context.user);
 }, { id: 'profile', after: 'create' });
 
-kernel.on('user:create', async (event, ctx) => {
+qk.on('user:create', async (event, ctx) => {
   await sendWelcomeEmail(event.context.user, event.context.profile);
 }, { id: 'email', after: ['create', 'profile'] });
 ```
@@ -1150,7 +1150,7 @@ kernel.on('user:create', async (event, ctx) => {
 
 **Strategy 1: Error Boundary (continue on error)**
 ```typescript
-const kernel = createKernel({
+const qk = createKernel({
   errorBoundary: true,
   onError: (error, event) => {
     logger.error(`Listener failed for ${event.name}:`, error);
@@ -1162,12 +1162,12 @@ const kernel = createKernel({
 
 **Strategy 2: Fail Fast (stop on first error)**
 ```typescript
-const kernel = createKernel({
+const qk = createKernel({
   errorBoundary: false
 });
 
 try {
-  await kernel.emit('critical:operation', data);
+  await qk.emit('critical:operation', data);
 } catch (error) {
   // AggregateError with all failures
   console.error('Operation failed:', error.errors);
@@ -1179,7 +1179,7 @@ try {
 Remove listener based on runtime conditions:
 
 ```typescript
-kernel.on('poll:data', async (event, ctx) => {
+qk.on('poll:data', async (event, ctx) => {
   const data = await fetchData();
   event.context.result = data;
 

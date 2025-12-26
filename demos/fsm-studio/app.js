@@ -1,19 +1,23 @@
-import { Kernel, useMachine, fromXState } from '@quazardous/quarkernel';
+import { Kernel, useMachine, fromXState, createMachine } from '@quazardous/quarkernel';
 
-// Import behaviors from individual files
-import orderBehavior from './examples/order.js';
-import paymentBehavior from './examples/payment.js';
-import coffeeBehavior from './examples/coffee.js';
-import trafficLightBehavior from './examples/trafficLight.js';
-import playerBehavior from './examples/player.js';
+// Import state-centric FSM configs from example files
+import orderConfig from './examples/order.js';
+import paymentConfig from './examples/payment.js';
+import coffeeConfig from './examples/coffee.js';
+import trafficLightConfig from './examples/trafficLight.js';
+import playerConfig from './examples/player.js';
 
-const machineBehaviors = {
-  order: orderBehavior,
-  payment: paymentBehavior,
-  coffeeMachine: coffeeBehavior,
-  trafficLight: trafficLightBehavior,
-  player: playerBehavior,
+// Store full configs (state-centric format with entry/exit/after inline)
+const exampleConfigs = {
+  order: orderConfig,
+  payment: paymentConfig,
+  coffee: coffeeConfig,
+  trafficLight: trafficLightConfig,
+  player: playerConfig,
 };
+
+// Legacy behaviors extracted from configs (for backward compatibility with editor)
+const machineBehaviors = {};
 
 // ===== Kernel & Machines =====
 const kernel = new Kernel();
@@ -71,14 +75,19 @@ function toXState(config) {
 // ===== XState to QuarKernel Converter (fromXState is imported) =====
 
 // ===== Generate XState Config with Actions =====
+// Now uses state-centric format: behavior.states[stateName].entry/exit/after
 function toXStateWithActions(config, behavior) {
   const id = config.prefix || config.id || 'machine';
-  const lines = [`// XState v5 Config for "${id}"`, `import { createMachine } from 'xstate';`, ''];
+  const lines = [`// XState v5 Config for "${id}"`, `import { createMachine, raise } from 'xstate';`, ''];
 
-  // Collect action names
+  // Collect action names from state-centric format
   const actionNames = new Set();
-  if (behavior?.onEnter) Object.keys(behavior.onEnter).forEach((s) => actionNames.add(`enter_${s}`));
-  if (behavior?.onExit) Object.keys(behavior.onExit).forEach((s) => actionNames.add(`exit_${s}`));
+  if (behavior?.states) {
+    for (const [stateName, stateConfig] of Object.entries(behavior.states)) {
+      if (stateConfig.entry) actionNames.add(`enter_${stateName}`);
+      if (stateConfig.exit) actionNames.add(`exit_${stateName}`);
+    }
+  }
   if (behavior?.on) Object.keys(behavior.on).forEach((e) => actionNames.add(`on_${e}`));
 
   // Build states object
@@ -86,14 +95,23 @@ function toXStateWithActions(config, behavior) {
   for (const [stateName, stateConfig] of Object.entries(config.states)) {
     const stateLines = [`    ${stateName}: {`];
 
-    // Entry action
-    if (behavior?.onEnter?.[stateName]) {
+    // Entry action (from state-centric: behavior.states[stateName].entry)
+    const behaviorStateConfig = behavior?.states?.[stateName];
+    if (behaviorStateConfig?.entry) {
       stateLines.push(`      entry: 'enter_${stateName}',`);
     }
 
-    // Exit action
-    if (behavior?.onExit?.[stateName]) {
+    // Exit action (from state-centric: behavior.states[stateName].exit)
+    if (behaviorStateConfig?.exit) {
       stateLines.push(`      exit: 'exit_${stateName}',`);
+    }
+
+    // After/timer (from state-centric: behavior.states[stateName].after)
+    if (behaviorStateConfig?.after) {
+      const timer = behaviorStateConfig.after;
+      stateLines.push('      after: {');
+      stateLines.push(`        ${timer.delay}: { actions: raise({ type: '${timer.send}' }) },`);
+      stateLines.push('      },');
     }
 
     // Transitions
@@ -107,14 +125,6 @@ function toXStateWithActions(config, behavior) {
           stateLines.push(`        ${event}: '${targetState}',`);
         }
       }
-      stateLines.push('      },');
-    }
-
-    // Timer as after (XState delay)
-    if (behavior?.timers?.[stateName]) {
-      const timer = behavior.timers[stateName];
-      stateLines.push('      after: {');
-      stateLines.push(`        ${timer.delay}: { actions: raise({ type: '${timer.send}' }) },`);
       stateLines.push('      },');
     }
 
@@ -140,14 +150,15 @@ function toXStateWithActions(config, behavior) {
     lines.push('// Actions implementations');
     lines.push('export const actions = {');
 
-    if (behavior?.onEnter) {
-      for (const [state, fn] of Object.entries(behavior.onEnter)) {
-        lines.push(`  enter_${state}: ${fn.toString()},`);
-      }
-    }
-    if (behavior?.onExit) {
-      for (const [state, fn] of Object.entries(behavior.onExit)) {
-        lines.push(`  exit_${state}: ${fn.toString()},`);
+    // From state-centric format
+    if (behavior?.states) {
+      for (const [state, stateConfig] of Object.entries(behavior.states)) {
+        if (stateConfig.entry) {
+          lines.push(`  enter_${state}: ${stateConfig.entry.toString()},`);
+        }
+        if (stateConfig.exit) {
+          lines.push(`  exit_${state}: ${stateConfig.exit.toString()},`);
+        }
       }
     }
     if (behavior?.on) {
@@ -162,10 +173,13 @@ function toXStateWithActions(config, behavior) {
   return lines.join('\n');
 }
 
-// ===== Format Behavior Object as JS Code =====
-function formatBehaviorCode(machineName, behavior) {
+// ===== Format State-Centric FSM as JS Code =====
+function formatBehaviorCode(machineName, fullConfig) {
   const config = machineConfigs[machineName];
-  const lines = [`// FSM Definition for "${machineName}"`, `// Helpers: ctx, set(obj), send(event), log(msg)`, '', `export const ${machineName} = {`];
+  const lines = [`// FSM Definition for "${machineName}"`, `// Helpers: ctx, set(obj), send(event), log(msg)`, '', `export default {`];
+
+  // ID
+  lines.push(`  id: '${machineName}',`);
 
   // Initial state
   if (config?.initial) {
@@ -177,60 +191,48 @@ function formatBehaviorCode(machineName, behavior) {
     lines.push(`  context: ${JSON.stringify(config.context)},`);
   }
 
-  // States with transitions
-  if (config?.states) {
-    lines.push('  states: {');
-    for (const [stateName, stateConfig] of Object.entries(config.states)) {
-      const transitions = stateConfig.on || {};
-      const transitionEntries = Object.entries(transitions);
-      if (transitionEntries.length === 0) {
-        lines.push(`    ${stateName}: {},`);
-      } else {
-        lines.push(`    ${stateName}: {`);
-        lines.push('      on: {');
-        for (const [event, target] of transitionEntries) {
-          const targetState = typeof target === 'string' ? target : target.target;
-          lines.push(`        ${event}: '${targetState}',`);
-        }
-        lines.push('      },');
-        lines.push('    },');
+  // States (state-centric: entry/exit/after inline)
+  const statesConfig = fullConfig?.states || config?.states || {};
+  lines.push('  states: {');
+  for (const [stateName, stateConfig] of Object.entries(statesConfig)) {
+    lines.push(`    ${stateName}: {`);
+
+    // entry
+    if (stateConfig.entry) {
+      lines.push(`      entry: ${stateConfig.entry.toString()},`);
+    }
+
+    // exit
+    if (stateConfig.exit) {
+      lines.push(`      exit: ${stateConfig.exit.toString()},`);
+    }
+
+    // after
+    if (stateConfig.after) {
+      lines.push(`      after: { delay: ${stateConfig.after.delay}, send: '${stateConfig.after.send}' },`);
+    }
+
+    // on (transitions)
+    const transitions = stateConfig.on || {};
+    const transitionEntries = Object.entries(transitions);
+    if (transitionEntries.length > 0) {
+      lines.push('      on: {');
+      for (const [event, target] of transitionEntries) {
+        const targetState = typeof target === 'string' ? target : target.target;
+        lines.push(`        ${event}: '${targetState}',`);
       }
+      lines.push('      },');
     }
-    lines.push('  },');
-  }
 
-  // onEnter behaviors
-  if (behavior?.onEnter && Object.keys(behavior.onEnter).length > 0) {
-    lines.push('  onEnter: {');
-    for (const [state, fn] of Object.entries(behavior.onEnter)) {
-      lines.push(`    ${state}: ${fn.toString()},`);
-    }
-    lines.push('  },');
+    lines.push('    },');
   }
+  lines.push('  },');
 
-  // onExit behaviors
-  if (behavior?.onExit && Object.keys(behavior.onExit).length > 0) {
-    lines.push('  onExit: {');
-    for (const [state, fn] of Object.entries(behavior.onExit)) {
-      lines.push(`    ${state}: ${fn.toString()},`);
-    }
-    lines.push('  },');
-  }
-
-  // on (event) behaviors
-  if (behavior?.on && Object.keys(behavior.on).length > 0) {
+  // Global event handlers (on at root level)
+  if (fullConfig?.on && Object.keys(fullConfig.on).length > 0) {
     lines.push('  on: {');
-    for (const [event, fn] of Object.entries(behavior.on)) {
+    for (const [event, fn] of Object.entries(fullConfig.on)) {
       lines.push(`    ${event}: ${fn.toString()},`);
-    }
-    lines.push('  },');
-  }
-
-  // timers
-  if (behavior?.timers && Object.keys(behavior.timers).length > 0) {
-    lines.push('  timers: {');
-    for (const [state, timer] of Object.entries(behavior.timers)) {
-      lines.push(`    ${state}: { send: '${timer.send}', delay: ${timer.delay} },`);
     }
     lines.push('  },');
   }
@@ -652,20 +654,21 @@ function showSelectedStateDetails(stateName) {
     html += `</ul>`;
   }
 
-  // Behaviors from machineBehaviors
-  if (behavior) {
-    // onEnter
-    if (behavior.onEnter && behavior.onEnter[stateName]) {
-      html += `<div class="state-info"><strong>onEnter:</strong> ✓</div>`;
+  // Behaviors from state-centric format (behavior.states[stateName])
+  const behaviorStateConfig = behavior?.states?.[stateName];
+  if (behaviorStateConfig) {
+    // entry
+    if (behaviorStateConfig.entry) {
+      html += `<div class="state-info"><strong>entry:</strong> ✓</div>`;
     }
-    // onExit
-    if (behavior.onExit && behavior.onExit[stateName]) {
-      html += `<div class="state-info"><strong>onExit:</strong> ✓</div>`;
+    // exit
+    if (behaviorStateConfig.exit) {
+      html += `<div class="state-info"><strong>exit:</strong> ✓</div>`;
     }
-    // Timer
-    if (behavior.timers && behavior.timers[stateName]) {
-      const timer = behavior.timers[stateName];
-      html += `<div class="state-info"><strong>Timer:</strong> ${timer.send} after ${timer.delay}ms</div>`;
+    // after (timer)
+    if (behaviorStateConfig.after) {
+      const timer = behaviorStateConfig.after;
+      html += `<div class="state-info"><strong>after:</strong> ${timer.send} after ${timer.delay}ms</div>`;
     }
   }
 
@@ -903,28 +906,19 @@ window.pasteCurrentTab = async () => {
   }
 };
 
-// ===== FSM Behaviors Management =====
+// ===== FSM State-Centric Templates =====
 const fsmTemplates = {
-  enter: `    onEnter: {
-      stateName: (ctx, { set, log }) => {
+  entry: `      entry: (ctx, { set, log }) => {
         set({ updated: true });
         log('Entered state');
-      },
-    },`,
-  exit: `    onExit: {
-      stateName: (ctx, { log }) => {
+      },`,
+  exit: `      exit: (ctx, { log }) => {
         log('Exiting state');
-      },
-    },`,
-  transition: `    on: {
-      EVENT_NAME: (ctx, { set, log }) => {
-        set({ counter: ctx.counter + 1 });
-        log('Event triggered');
-      },
-    },`,
-  timer: `    timers: {
-      stateName: { send: 'NEXT_EVENT', delay: 2000 },
-    },`,
+      },`,
+  on: `      on: {
+        EVENT_NAME: 'targetState',
+      },`,
+  after: `      after: { delay: 2000, send: 'NEXT_EVENT' },`,
 };
 
 window.addCallbackTemplate = (type) => {
@@ -1054,18 +1048,10 @@ window.importXState = () => {
   }
 };
 
-// ===== Example Loading from JSON files =====
-const exampleFiles = {
-  order: './examples/order.json',
-  payment: './examples/payment.json',
-  coffee: './examples/coffee.json',
-  trafficLight: './examples/trafficLight.json',
-  player: './examples/player.json',
-};
-
+// ===== Example Loading (state-centric format) =====
 window.loadExample = async (name) => {
-  const filePath = exampleFiles[name];
-  if (!filePath) return;
+  const example = exampleConfigs[name];
+  if (!example) return;
 
   // Reset dirty state before loading new example
   if (typeof clearMasterTab === 'function') {
@@ -1076,71 +1062,42 @@ window.loadExample = async (name) => {
   hideSelectedStateDetails();
 
   try {
-    const response = await fetch(filePath);
-    const example = await response.json();
-
     const machineName = example.id;
-    const config = {
+
+    // Destroy previous machine if exists
+    if (machines[machineName]?.destroy) {
+      machines[machineName].destroy();
+    }
+
+    // Create machine using createMachine with custom helpers
+    // Built-in helpers: set, send, log (log defaults to console.log)
+    // We override log to use the UI log function
+    const machine = createMachine({
+      ...example,
+      helpers: {
+        log: (msg) => {
+          log(msg, 'enter');
+          updateUI();
+        },
+      },
+    });
+
+    machines[machineName] = machine;
+
+    // Store config for the editor/graph
+    machineConfigs[machineName] = {
       prefix: machineName,
       initial: example.initial,
       context: example.context || {},
       trackHistory: true,
-      states: example.states,
+      states: Object.fromEntries(
+        Object.entries(example.states).map(([name, cfg]) => [name, { on: cfg.on || {} }])
+      ),
+      _fullConfig: example,
     };
 
-    // Store config
-    machineConfigs[machineName] = config;
-
-    // Create machine using QuarKernel
-    machines[machineName] = useMachine(kernel, config);
-
-    // Register behavior listeners (look up machineBehaviors at runtime for live updates)
-    const machine = machines[machineName];
-
-    // Helper functions for behavior handlers
-    const createHelpers = () => ({
-      set: (obj) => machine.setContext({ ...machine.getContext(), ...obj }),
-      send: (event) => machine.send(event),
-      log: (msg, type = 'enter') => log(msg, type),
-    });
-
-    // onEnter handlers - lookup behavior at runtime
-    kernel.on(`${machineName}:enter:*`, (e) => {
-      const behavior = machineBehaviors[machineName];
-      const state = e.data.state;
-      const handler = behavior?.onEnter?.[state];
-      if (handler) {
-        handler(machine.getContext(), createHelpers());
-        updateUI();
-      }
-      // timers - also checked at runtime
-      const timer = behavior?.timers?.[state];
-      if (timer) {
-        setTimeout(() => machine.send(timer.send), timer.delay);
-      }
-    });
-
-    // onExit handlers - lookup behavior at runtime
-    kernel.on(`${machineName}:exit:*`, (e) => {
-      const behavior = machineBehaviors[machineName];
-      const state = e.data.state;
-      const handler = behavior?.onExit?.[state];
-      if (handler) {
-        handler(machine.getContext(), createHelpers());
-        updateUI();
-      }
-    });
-
-    // on (event) handlers - lookup behavior at runtime
-    kernel.on(`${machineName}:transition`, (e) => {
-      const behavior = machineBehaviors[machineName];
-      const event = e.data.event;
-      const handler = behavior?.on?.[event];
-      if (handler) {
-        handler(machine.getContext(), createHelpers());
-        updateUI();
-      }
-    });
+    // Store in machineBehaviors for backward compatibility with editor
+    machineBehaviors[machineName] = example;
 
     // Select and display
     selectMachine(machineName);

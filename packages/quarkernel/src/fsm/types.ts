@@ -48,17 +48,30 @@ export interface TransitionDef<TContext = any> {
 }
 
 /**
- * State node definition
+ * Timer/after definition for auto-transitions
+ */
+export interface AfterDef {
+  /** Delay in milliseconds */
+  delay: number;
+  /** Event to send after delay */
+  send: string;
+}
+
+/**
+ * State node definition (state-centric format)
  */
 export interface StateNode<TContext = any> {
   /** Transitions from this state: event -> target or TransitionDef */
   on?: Record<TransitionEvent, StateName | TransitionDef<TContext>>;
 
   /** Action on entering this state */
-  onEnter?: ActionFunction<TContext>;
+  entry?: ActionFunction<TContext>;
 
   /** Action on exiting this state */
-  onExit?: ActionFunction<TContext>;
+  exit?: ActionFunction<TContext>;
+
+  /** Auto-transition after delay: { delay: 3000, send: 'TIMER' } */
+  after?: AfterDef;
 }
 
 /**

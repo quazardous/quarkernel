@@ -10,7 +10,7 @@
  * - Zero runtime dependencies
  */
 
-export const VERSION = '2.1.0';
+export const VERSION = '2.2.0';
 
 // Core exports
 export { KernelEvent } from './kernel-event.js';
@@ -65,7 +65,7 @@ export {
 export { toposort, CyclicDependencyError, type TopoNode } from './toposort.js';
 
 // FSM - State Machine Layer
-export { useMachine, defineMachine, fromXState, toXStateFormat } from './fsm/index.js';
+export { useMachine, defineMachine, createMachine } from './fsm/index.js';
 export type {
   MachineConfig,
   Machine,
@@ -78,6 +78,15 @@ export type {
   TransitionEvent,
   GuardFunction,
   ActionFunction,
-  XStateMachineConfig,
-  ImportOptions,
+  CreateMachineConfig,
+  StateConfig,
+  BehaviorMachine,
+  BehaviorFn,
+  BehaviorHelpers,
+  BuiltInHelpers,
+  AfterDef,
 } from './fsm/index.js';
+
+// XState interop (separate sub-package: @quazardous/quarkernel/xstate)
+export { fromXState, toXStateFormat, formatStateCentricCode } from './xstate/index.js';
+export type { XStateMachineConfig, ImportOptions, XStateConfigWithActions } from './xstate/index.js';

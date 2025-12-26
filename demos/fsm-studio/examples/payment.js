@@ -1,22 +1,39 @@
 /**
- * Payment Machine - FSM Behaviors
+ * Payment Machine - State-centric FSM
  */
 export default {
-  onEnter: {
-    processing: (ctx, { set, log }) => {
-      set({ startedAt: Date.now() });
-      log('Processing payment...');
+  id: 'payment',
+  initial: 'pending',
+  context: { amount: 0, method: null },
+  states: {
+    pending: {
+      on: { PROCESS: 'processing' },
     },
-    paid: (ctx, { log }) => {
-      const duration = Date.now() - (ctx.startedAt || 0);
-      log(`Payment completed in ${duration}ms`);
+    processing: {
+      entry: (ctx, { set, log }) => {
+        set({ startedAt: Date.now() });
+        log('Processing payment...');
+      },
+      after: { delay: 1500, send: 'SUCCESS' },
+      on: { SUCCESS: 'paid', FAIL: 'failed', TIMEOUT: 'pending' },
     },
-    failed: (ctx, { set, log }) => {
-      set({ retries: (ctx.retries || 0) + 1 });
-      log(`Payment failed. Retry #${(ctx.retries || 0) + 1}`);
+    paid: {
+      entry: (ctx, { log }) => {
+        const duration = Date.now() - (ctx.startedAt || 0);
+        log(`Payment completed in ${duration}ms`);
+      },
+      on: { REFUND: 'refunding' },
     },
-  },
-  timers: {
-    processing: { send: 'SUCCESS', delay: 1500 },
+    failed: {
+      entry: (ctx, { set, log }) => {
+        set({ retries: (ctx.retries || 0) + 1 });
+        log(`Payment failed. Retry #${(ctx.retries || 0) + 1}`);
+      },
+      on: { RETRY: 'processing' },
+    },
+    refunding: {
+      on: { REFUND_SUCCESS: 'refunded', REFUND_FAIL: 'paid' },
+    },
+    refunded: {},
   },
 };

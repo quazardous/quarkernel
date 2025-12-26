@@ -118,23 +118,28 @@
           <div class="ide-tab" data-tab="xstate">XState</div>
           <div class="ide-tab active" data-tab="fsm">FSM</div>
           <!-- Dynamic actions per tab -->
-          <div class="ide-tab-actions" data-for="json-state" style="display:none">
-            <button class="btn btn-sm btn-secondary" onclick="copyCurrentTab()">Copy</button>
-            <button class="btn btn-sm btn-secondary" onclick="pasteCurrentTab()">Paste</button>
-          </div>
-          <div class="ide-tab-actions" data-for="xstate" style="display:none">
-            <button class="btn btn-sm btn-secondary" onclick="copyCurrentTab()">Copy</button>
-          </div>
           <!-- Right-side buttons (grouped) -->
           <div class="ide-tab-actions-right">
-            <!-- Add callback (FSM tab only, hidden when collapsed) -->
+            <!-- JSON State tab actions -->
+            <div class="ide-tab-actions" data-for="json-state" style="display:none">
+              <button class="btn btn-sm btn-secondary" onclick="copyCurrentTab()">Copy</button>
+              <button class="btn btn-sm btn-secondary" onclick="pasteCurrentTab()">Paste</button>
+            </div>
+            <!-- XState tab actions -->
+            <div class="ide-tab-actions" data-for="xstate" style="display:none">
+              <button class="btn btn-sm btn-secondary" onclick="copyCurrentTab()">Copy</button>
+              <button class="btn btn-sm btn-secondary" onclick="pasteCurrentTab()">Paste</button>
+            </div>
+            <!-- FSM tab actions -->
             <div class="ide-tab-actions" data-for="fsm">
+              <button class="btn btn-sm btn-secondary" onclick="copyCurrentTab()">Copy</button>
+              <button class="btn btn-sm btn-secondary" onclick="pasteCurrentTab()">Paste</button>
               <select id="add-callback-type" class="callback-type-select" onchange="addCallbackTemplate(this.value); this.selectedIndex=0;">
                 <option value="" disabled selected>+ Add</option>
-                <option value="enter">onEnter</option>
-                <option value="exit">onExit</option>
-                <option value="transition">on (event)</option>
-                <option value="timer">timer</option>
+                <option value="entry">entry</option>
+                <option value="exit">exit</option>
+                <option value="on">on (event)</option>
+                <option value="after">after (timer)</option>
               </select>
             </div>
             <!-- Save/Cancel buttons (disabled when not editing) -->

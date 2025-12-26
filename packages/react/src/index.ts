@@ -1,12 +1,12 @@
 /**
- * @quarkernel/react - React bindings for QuarKernel
+ * @quazardous/quarkernel-react - React bindings for QuarKernel
  *
  * Provides Context provider and hooks for using QuarKernel in React applications.
  *
  * @example
  * ```tsx
  * import { createKernel } from '@quazardous/quarkernel';
- * import { KernelProvider, useKernel } from '@quarkernel/react';
+ * import { KernelProvider, useKernel } from '@quazardous/quarkernel-react';
  *
  * const kernel = createKernel();
  *
@@ -32,7 +32,7 @@
  * ```
  */
 
-export const VERSION = '2.0.0-beta';
+export const VERSION = '2.1.0';
 
 // Components
 export { KernelProvider, type KernelProviderProps } from './KernelProvider.js';

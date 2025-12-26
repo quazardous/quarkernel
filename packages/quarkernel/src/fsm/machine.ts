@@ -128,8 +128,8 @@ export function useMachine<TContext = Record<string, any>>(
     }
 
     // Exit current state
-    if (fromNode?.onExit) {
-      await fromNode.onExit(context, event, payload);
+    if (fromNode?.exit) {
+      await fromNode.exit(context, event, payload);
     }
     await emitFSM(`exit:${fromState}`, {
       state: fromState,
@@ -184,8 +184,8 @@ export function useMachine<TContext = Record<string, any>>(
       payload,
       forced,
     });
-    if (toNode.onEnter) {
-      await toNode.onEnter(context, event, payload);
+    if (toNode.entry) {
+      await toNode.entry(context, event, payload);
     }
   };
 
@@ -318,8 +318,8 @@ export function useMachine<TContext = Record<string, any>>(
       await emitFSM(`enter:${initial}`, {
         state: initial,
       });
-      if (initialNode?.onEnter) {
-        await initialNode.onEnter(context, '__INIT__', undefined);
+      if (initialNode?.entry) {
+        await initialNode.entry(context, '__INIT__', undefined);
       }
     }, 0);
   }

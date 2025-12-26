@@ -62,7 +62,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         continue-on-error: true
 
-      - name: Publish @quarkernel/react
+      - name: Publish @quazardous/quarkernel-react
         run: npm publish --workspace=packages/react --tag ${{ steps.npm-tag.outputs.tag }} --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,11 +1,11 @@
-# @quarkernel/react
+# @quazardous/quarkernel-react
 
 React 18+ bindings for QuarKernel - Context provider and hooks with auto-cleanup.
 
 ## Installation
 
 ```bash
-npm install @quazardous/quarkernel @quarkernel/react
+npm install @quazardous/quarkernel @quazardous/quarkernel-react
 ```
 
 ## Features
@@ -23,9 +23,9 @@ npm install @quazardous/quarkernel @quarkernel/react
 
 ```tsx
 import { createKernel } from '@quazardous/quarkernel';
-import { KernelProvider } from '@quarkernel/react';
+import { KernelProvider } from '@quazardous/quarkernel-react';
 
-const kernel = createKernel();
+const qk = createKernel();
 
 function App() {
   return (
@@ -41,13 +41,13 @@ function App() {
 Access kernel instance from any component:
 
 ```tsx
-import { useKernel } from '@quarkernel/react';
+import { useKernel } from '@quazardous/quarkernel-react';
 
 function MyComponent() {
-  const kernel = useKernel();
+  const qk = useKernel();
 
   const handleClick = () => {
-    kernel.emit('button:clicked', { timestamp: Date.now() });
+    qk.emit('button:clicked', { timestamp: Date.now() });
   };
 
   return <button onClick={handleClick}>Click me</button>;
@@ -59,7 +59,7 @@ function MyComponent() {
 Register listener with automatic cleanup on unmount:
 
 ```tsx
-import { useOn } from '@quarkernel/react';
+import { useOn } from '@quazardous/quarkernel-react';
 
 function Notifications() {
   useOn('notification:new', (event) => {
@@ -76,7 +76,7 @@ function Notifications() {
 Reactive state derived from events:
 
 ```tsx
-import { useEventState } from '@quarkernel/react';
+import { useEventState } from '@quazardous/quarkernel-react';
 
 function Counter() {
   const count = useEventState('counter:updated', 0, (event) => event.data.value);
@@ -88,7 +88,7 @@ function Counter() {
 ### Wildcard Patterns
 
 ```tsx
-import { useOn } from '@quarkernel/react';
+import { useOn } from '@quazardous/quarkernel-react';
 
 function UserTracker() {
   useOn('user:*', (event) => {

@@ -31,19 +31,19 @@ npm install @quazardous/quarkernel
 ```typescript
 import { createKernel } from '@quazardous/quarkernel';
 
-const kernel = createKernel();
+const qk = createKernel();
 
 // Dependency ordering
-kernel.on('checkout', async (e) => {
+qk.on('checkout', async (e) => {
   e.context.stock = await checkStock(e.data.items);
 }, { id: 'stock' });
 
-kernel.on('checkout', async (e) => {
+qk.on('checkout', async (e) => {
   // Runs AFTER stock check
   await processPayment(e.data.card, e.context.stock);
 }, { after: ['stock'] });
 
-await kernel.emit('checkout', { items: ['sku-123'], card: 'tok_visa' });
+await qk.emit('checkout', { items: ['sku-123'], card: 'tok_visa' });
 ```
 
 ## Composition
@@ -54,11 +54,11 @@ React to multiple events:
 import { Composition } from '@quazardous/quarkernel';
 
 const checkout = new Composition([
-  [kernel, 'cart:ready'],
-  [kernel, 'payment:confirmed']
+  [qk, 'cart:ready'],
+  [qk, 'payment:confirmed']
 ]);
 
-checkout.on('composite', () => {
+checkout.onComposed(() => {
   console.log('Both events fired!');
 });
 ```
@@ -66,7 +66,7 @@ checkout.on('composite', () => {
 ## Framework Adapters
 
 - `@quazardous/quarkernel-vue` - Vue 3 plugin
-- `@quarkernel/react` - React hooks
+- `@quazardous/quarkernel-react` - React hooks
 - `@quazardous/quarkernel-svelte` - Svelte 5 context
 
 ## Documentation

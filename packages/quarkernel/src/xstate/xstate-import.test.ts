@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { Kernel } from '../kernel.js';
-import { useMachine } from './machine.js';
+import { useMachine } from '../fsm/machine.js';
 import { fromXState, toXStateFormat } from './xstate-import.js';
 import type { XStateMachineConfig } from './xstate-import.js';
 
@@ -141,41 +141,41 @@ describe('fromXState', () => {
   });
 
   it('should convert entry actions', () => {
-    const onEnterRunning = vi.fn();
+    const entryAction = vi.fn();
 
     const xstateConfig: XStateMachineConfig = {
       initial: 'idle',
       states: {
         idle: { on: { START: 'running' } },
-        running: { entry: 'onEnterRunning' },
+        running: { entry: 'entryAction' },
       },
     };
 
     const config = fromXState(xstateConfig, {
       prefix: 'test',
-      actions: { onEnterRunning },
+      actions: { entryAction },
     });
 
-    expect(config.states.running.onEnter).toBeDefined();
+    expect(config.states.running.entry).toBeDefined();
   });
 
   it('should convert exit actions', () => {
-    const onExitIdle = vi.fn();
+    const exitAction = vi.fn();
 
     const xstateConfig: XStateMachineConfig = {
       initial: 'idle',
       states: {
-        idle: { on: { START: 'running' }, exit: 'onExitIdle' },
+        idle: { on: { START: 'running' }, exit: 'exitAction' },
         running: {},
       },
     };
 
     const config = fromXState(xstateConfig, {
       prefix: 'test',
-      actions: { onExitIdle },
+      actions: { exitAction },
     });
 
-    expect(config.states.idle.onExit).toBeDefined();
+    expect(config.states.idle.exit).toBeDefined();
   });
 
   it('should work with useMachine after conversion', async () => {
@@ -267,8 +267,8 @@ describe('toXStateFormat', () => {
               actions: () => {},
             },
           },
-          onEnter: () => {},
-          onExit: () => {},
+          entry: () => {},
+          exit: () => {},
         },
         running: {},
       },
@@ -279,7 +279,7 @@ describe('toXStateFormat', () => {
     const transition = xstate.states.idle.on?.GO as any;
     expect(transition.guard).toEqual({ type: 'guard' });
     expect(transition.actions).toEqual({ type: 'action' });
-    expect(xstate.states.idle.entry).toEqual({ type: 'onEnter' });
-    expect(xstate.states.idle.exit).toEqual({ type: 'onExit' });
+    expect(xstate.states.idle.entry).toEqual({ type: 'entry' });
+    expect(xstate.states.idle.exit).toEqual({ type: 'exit' });
   });
 });

@@ -20,7 +20,7 @@ import { createKernel } from '@quazardous/quarkernel';
 import { QuarKernelPlugin } from '@quazardous/quarkernel-vue';
 import App from './App.vue';
 
-const kernel = createKernel();
+const qk = createKernel();
 const app = createApp(App);
 
 app.use(QuarKernelPlugin, { kernel });
@@ -34,16 +34,16 @@ app.mount('#app');
 import { useKernel } from '@quazardous/quarkernel-vue';
 import { onMounted } from 'vue';
 
-const kernel = useKernel();
+const qk = useKernel();
 
 onMounted(() => {
-  kernel.on('user:login', async (event) => {
+  qk.on('user:login', async (event) => {
     console.log('User logged in:', event.data);
   });
 });
 
 async function login() {
-  await kernel.emit('user:login', { userId: '123' });
+  await qk.emit('user:login', { userId: '123' });
 }
 </script>
 ```
@@ -79,10 +79,10 @@ interface AppEvents {
   'user:logout': { userId: string };
 }
 
-const kernel = createKernel<AppEvents>();
+const qk = createKernel<AppEvents>();
 
 // In component
-const kernel = useKernel<typeof kernel>();
+const qk = useKernel<typeof kernel>();
 ```
 
 ## License

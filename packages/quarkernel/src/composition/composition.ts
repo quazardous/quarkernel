@@ -22,6 +22,12 @@ import type {
 } from '../types.js';
 
 /**
+ * Reserved internal event name for composite emissions
+ * Using a prefix that users are unlikely to use accidentally
+ */
+const COMPOSED_EVENT = '__qk:composed__';
+
+/**
  * Buffered event entry for a source kernel
  */
 interface BufferedEvent {
@@ -48,13 +54,16 @@ interface KernelSubscription {
  * const userKernel = createKernel();
  * const profileKernel = createKernel();
  *
- * const composition = new Composition([userKernel, profileKernel], {
+ * const composition = new Composition([
+ *   [userKernel, 'user:loaded'],
+ *   [profileKernel, 'profile:loaded'],
+ * ], {
  *   merger: createNamespacedMerger(),
  *   bufferLimit: 100,
  * });
  *
- * composition.on('composite', (event) => {
- *   // event.context contains merged contexts from both kernels
+ * composition.onComposed((event) => {
+ *   // event.data.merged contains merged contexts from all sources
  * });
  * ```
  */
@@ -240,7 +249,7 @@ export class Composition<Events extends EventMap = EventMap> {
     }
 
     // Only emit if there are listeners (skip if no one is listening)
-    if (this.kernel.listenerCount('composite' as keyof Events) === 0) {
+    if (this.kernel.listenerCount(COMPOSED_EVENT as keyof Events) === 0) {
       return false;
     }
 
@@ -269,8 +278,8 @@ export class Composition<Events extends EventMap = EventMap> {
     const mergeResult = this.merger.mergeWithConflicts(contexts, sources);
     this.lastConflicts = mergeResult.conflicts;
 
-    // Emit composite event through internal kernel
-    await this.kernel.emit('composite' as keyof Events, {
+    // Emit composed event through internal kernel
+    await this.kernel.emit(COMPOSED_EVENT as keyof Events, {
       sources,
       contexts: Object.fromEntries(contexts),
       merged: mergeResult.context,
@@ -295,8 +304,37 @@ export class Composition<Events extends EventMap = EventMap> {
   }
 
   /**
-   * Register a listener for composite events
-   * Delegates to internal kernel
+   * Register a listener for when all source events have fired
+   * This is the primary way to react to composition completion
+   *
+   * @param listener - Function called with merged context when composition completes
+   * @param options - Listener options (priority, id, etc.)
+   * @returns Unbind function to remove the listener
+   */
+  onComposed(
+    listener: ListenerFunction<Events[keyof Events]>,
+    options?: ListenerOptions
+  ): () => void {
+    return this.kernel.on(COMPOSED_EVENT as keyof Events, listener, options);
+  }
+
+  /**
+   * Remove a listener for composed events
+   */
+  offComposed(listener?: Function): void {
+    this.kernel.off(COMPOSED_EVENT, listener);
+  }
+
+  /**
+   * Get number of composed event listeners
+   */
+  composedListenerCount(): number {
+    return this.kernel.listenerCount(COMPOSED_EVENT as keyof Events);
+  }
+
+  /**
+   * Register a listener for events on internal kernel
+   * Note: Use onComposed() to listen for composition completion
    */
   on<K extends keyof Events>(
     eventName: K,
@@ -316,12 +354,15 @@ export class Composition<Events extends EventMap = EventMap> {
 
   /**
    * Emit an event through the composition
-   * Delegates to internal kernel
+   * Note: Reserved internal events (prefixed with __qk:) cannot be emitted
    */
   async emit<K extends keyof Events>(
     eventName: K,
     data?: Events[K]
   ): Promise<void> {
+    if (String(eventName).startsWith('__qk:')) {
+      throw new Error(`Cannot emit reserved event: ${String(eventName)}`);
+    }
     return this.kernel.emit(eventName, data);
   }
 

@@ -3,10 +3,10 @@
  *
  * Two APIs available:
  *
- * 1. createMachine() - Standalone with high-level behaviors
+ * 1. createMachine() - Standalone with high-level behaviors (state-centric)
  * 2. useMachine()    - Low-level with external kernel
  *
- * @example Standalone
+ * @example Standalone (state-centric)
  * ```ts
  * import { createMachine } from '@quazardous/quarkernel/fsm';
  *
@@ -16,20 +16,22 @@
  *   context: { items: 0 },
  *   states: {
  *     draft: { on: { SUBMIT: 'pending' } },
- *     pending: { on: { APPROVE: 'confirmed' } },
- *     confirmed: {}
- *   },
- *   on: {
- *     SUBMIT: (ctx, { log }) => log('Submitted!')
- *   },
- *   onEnter: {
- *     confirmed: (ctx, { log }) => log('Order confirmed!')
+ *     pending: {
+ *       entry: (ctx, { log }) => log('Order pending...'),
+ *       on: { APPROVE: 'confirmed' }
+ *     },
+ *     confirmed: {
+ *       entry: (ctx, { log }) => log('Order confirmed!'),
+ *     },
+ *     processing: {
+ *       after: { delay: 2000, send: 'COMPLETE' },
+ *       on: { COMPLETE: 'done' }
+ *     }
  *   }
  * });
  *
  * order.send('SUBMIT');
  * console.log(order.state);   // 'pending'
- * console.log(order.toXState()); // XState format
  * ```
  *
  * @example With Kernel
@@ -52,25 +54,16 @@
 export { createMachine } from './create-machine.js';
 export type {
   CreateMachineConfig,
+  StateConfig,
   BehaviorMachine,
   BehaviorFn,
   BehaviorHelpers,
-  TimerDef,
-  XStateOutput,
+  BuiltInHelpers,
+  AfterDef,
 } from './create-machine.js';
 
 // Low-level API
 export { useMachine, defineMachine } from './machine.js';
-export { fromXState, toXStateFormat } from './xstate-import.js';
-export {
-  toXStateWithBehaviors,
-  formatXStateCode,
-  formatBehaviorsCode,
-} from './xstate-behaviors.js';
-export type {
-  FSMBehaviors,
-  XStateConfigWithActions,
-} from './xstate-behaviors.js';
 export type {
   MachineConfig,
   Machine,
@@ -83,5 +76,5 @@ export type {
   TransitionEvent,
   GuardFunction,
   ActionFunction,
+  AfterDef as AfterDefLowLevel,
 } from './types.js';
-export type { XStateMachineConfig, ImportOptions } from './xstate-import.js';

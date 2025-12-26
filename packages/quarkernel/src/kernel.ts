@@ -684,7 +684,7 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
    *   { merger: createNamespacedMerger() }
    * );
    *
-   * composition.on('composite', (event) => {
+   * composition.onComposed((event) => {
    *   console.log('All sources ready:', event.data.merged);
    * });
    * ```

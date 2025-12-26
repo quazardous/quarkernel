@@ -34,7 +34,7 @@ describe('Kernel.compose()', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { id: 1 });
       await profileKernel.emit('profile:loaded', { bio: 'test' });
@@ -54,7 +54,7 @@ describe('Kernel.compose()', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { id: 1 });
       await profileKernel.emit('profile:loaded', { bio: 'test' });
@@ -82,7 +82,7 @@ describe('Kernel.compose()', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { count: 1 });
       await profileKernel.emit('profile:loaded', { count: 2 });
@@ -119,7 +119,7 @@ describe('Kernel.compose()', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       // First composition
       await userKernel.emit('user:loaded', { id: 1 });
@@ -152,7 +152,7 @@ describe('Kernel.compose()', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { count: 1 });
       await profileKernel.emit('profile:loaded', { count: 2 });
@@ -181,7 +181,7 @@ describe('Kernel.compose()', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { id: 1 });
       await profileKernel.emit('profile:loaded', { bio: 'test' });
@@ -210,7 +210,7 @@ describe('Kernel.compose()', () => {
       });
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       // Should not throw due to error boundary
       await expect(errorKernel.emit('error:test', { id: 1 })).resolves.toBeUndefined();
@@ -233,7 +233,7 @@ describe('Kernel.compose()', () => {
       });
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await wildcardKernel.emit('user:created', { id: 1 });
       await profileKernel.emit('profile:loaded', { bio: 'test' });
@@ -258,7 +258,7 @@ describe('Kernel.compose()', () => {
       const composition = Kernel.compose([userKernel, 'user:loaded']);
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { id: 1 });
 
@@ -275,7 +275,7 @@ describe('Kernel.compose()', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:created', { id: 1 });
       await userKernel.emit('user:updated', { id: 1, name: 'test' });
@@ -296,7 +296,7 @@ describe('Kernel.compose()', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { id: 1 });
       await profileKernel.emit('profile:loaded', { bio: 'test' });

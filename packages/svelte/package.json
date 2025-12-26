@@ -1,6 +1,6 @@
 {
   "name": "@quazardous/quarkernel-svelte",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "description": "Svelte 5 adapter for QuarKernel - event kernel integration with Svelte context",
   "author": "quazardous <berliozdavid@gmail.com>",
@@ -52,7 +52,7 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@quazardous/quarkernel": "^2.0.0-alpha",
+    "@quazardous/quarkernel": "^2.1.0",
     "svelte": "^5.0.0"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 {
-  "name": "@quarkernel/react",
-  "version": "2.0.0",
+  "name": "@quazardous/quarkernel-react",
+  "version": "2.1.0",
   "type": "module",
   "description": "React bindings for QuarKernel - Context provider and hooks",
   "author": "quazardous <berliozdavid@gmail.com>",
@@ -49,7 +49,7 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@quazardous/quarkernel": "^2.0.0",
+    "@quazardous/quarkernel": "^2.1.0",
     "react": "^18.0.0 || ^19.0.0"
   },
   "devDependencies": {

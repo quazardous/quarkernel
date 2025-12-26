@@ -41,7 +41,7 @@ describe('Composition - Conflict Detection', () => {
       );
 
       const events: any[] = [];
-      composition.on('composite', (event) => {
+      composition.onComposed((event) => {
         events.push(event);
       });
 
@@ -74,7 +74,7 @@ describe('Composition - Conflict Detection', () => {
       );
 
       const events: any[] = [];
-      composition.on('composite', (event) => {
+      composition.onComposed((event) => {
         events.push(event);
       });
 
@@ -116,7 +116,7 @@ describe('Composition - Conflict Detection', () => {
       );
 
       const events: any[] = [];
-      composition.on('composite', (event) => {
+      composition.onComposed((event) => {
         events.push(event);
       });
 
@@ -149,7 +149,7 @@ describe('Composition - Conflict Detection', () => {
       );
 
       const events: any[] = [];
-      composition.on('composite', (event) => {
+      composition.onComposed((event) => {
         events.push(event);
       });
 
@@ -173,7 +173,7 @@ describe('Composition - Conflict Detection', () => {
       );
 
       const events: any[] = [];
-      composition.on('composite', (event) => {
+      composition.onComposed((event) => {
         events.push(event);
       });
 
@@ -216,7 +216,7 @@ describe('Composition - Conflict Detection', () => {
       );
 
       const events: any[] = [];
-      composition.on('composite', (event) => {
+      composition.onComposed((event) => {
         events.push(event);
       });
 
@@ -259,7 +259,7 @@ describe('Composition - Conflict Detection', () => {
         { merger: createOverrideMerger() }
       );
 
-      composition.on('composite', () => {});
+      composition.onComposed(() => {});
 
       await kernel1.emit('event1', { value: 1 });
       await kernel2.emit('event2', { value: 2 });
@@ -286,7 +286,7 @@ describe('Composition - Conflict Detection', () => {
         { merger: createOverrideMerger() }
       );
 
-      composition.on('composite', () => {});
+      composition.onComposed(() => {});
 
       await kernel1.emit('event1', { value: 1 });
       await kernel2.emit('event2', { value: 2 });
@@ -340,7 +340,7 @@ describe('Composition - Conflict Detection', () => {
       );
 
       const events: any[] = [];
-      composition.on('composite', (event) => {
+      composition.onComposed((event) => {
         events.push(event);
       });
 
@@ -369,7 +369,7 @@ describe('Composition - Conflict Detection', () => {
       );
 
       const events: any[] = [];
-      composition.on('composite', (event) => {
+      composition.onComposed((event) => {
         events.push(event);
       });
 

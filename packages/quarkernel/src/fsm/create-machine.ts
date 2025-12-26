@@ -7,20 +7,25 @@
 
 import { Kernel } from '../kernel.js';
 import { useMachine } from './machine.js';
-import { toXStateFormat } from './xstate-import.js';
 import type { Machine, MachineConfig } from './types.js';
 
 /**
- * Behavior helpers passed to callbacks
+ * Built-in helpers (always available)
  */
-export interface BehaviorHelpers<TContext = Record<string, unknown>> {
+export interface BuiltInHelpers<TContext = Record<string, unknown>> {
   /** Merge into context */
   set: (partial: Partial<TContext>) => void;
   /** Trigger transition */
   send: (event: string, payload?: unknown) => void;
-  /** Log message (if logger provided) */
+  /** Log message (default: console.log) */
   log: (message: string) => void;
 }
+
+/**
+ * Behavior helpers passed to callbacks (built-ins + custom)
+ */
+export type BehaviorHelpers<TContext = Record<string, unknown>, TCustom = Record<string, unknown>> =
+  BuiltInHelpers<TContext> & TCustom;
 
 /**
  * Behavior callback
@@ -31,9 +36,9 @@ export type BehaviorFn<TContext = Record<string, unknown>> = (
 ) => void | Promise<void>;
 
 /**
- * Timer definition
+ * Timer/after definition
  */
-export interface TimerDef {
+export interface AfterDef {
   /** Event to send */
   send: string;
   /** Delay in ms */
@@ -41,9 +46,23 @@ export interface TimerDef {
 }
 
 /**
- * High-level machine config with behaviors
+ * State-centric state definition
  */
-export interface CreateMachineConfig<TContext = Record<string, unknown>> {
+export interface StateConfig<TContext = Record<string, unknown>> {
+  /** Transitions: { EVENT: 'target' } or { EVENT: { target: 'x', cond: 'guard' } } */
+  on?: Record<string, string | { target: string; cond?: string }>;
+  /** Action on entering this state */
+  entry?: BehaviorFn<TContext>;
+  /** Action on exiting this state */
+  exit?: BehaviorFn<TContext>;
+  /** Auto-transition after delay: { delay: 3000, send: 'TIMER' } */
+  after?: AfterDef;
+}
+
+/**
+ * High-level machine config (state-centric)
+ */
+export interface CreateMachineConfig<TContext = Record<string, unknown>, THelpers = Record<string, unknown>> {
   /** Machine identifier */
   id: string;
 
@@ -53,37 +72,14 @@ export interface CreateMachineConfig<TContext = Record<string, unknown>> {
   /** Initial context */
   context?: TContext;
 
-  /** State definitions: { stateName: { on: { EVENT: 'target' } } } */
-  states: Record<string, {
-    on?: Record<string, string | { target: string; cond?: string }>;
-  }>;
+  /** State definitions with entry/exit/after inline */
+  states: Record<string, StateConfig<TContext>>;
 
-  /** Event handlers: { EVENT_NAME: (ctx, helpers) => ... } */
+  /** Global event handlers: { EVENT_NAME: (ctx, helpers) => ... } */
   on?: Record<string, BehaviorFn<TContext>>;
 
-  /** State entry handlers: { stateName: (ctx, helpers) => ... } */
-  onEnter?: Record<string, BehaviorFn<TContext>>;
-
-  /** State exit handlers: { stateName: (ctx, helpers) => ... } */
-  onExit?: Record<string, BehaviorFn<TContext>>;
-
-  /** Auto-timers: { stateName: { send: 'EVENT', delay: 2000 } } */
-  timers?: Record<string, TimerDef>;
-
-  /** Logger function (optional) */
-  logger?: (message: string) => void;
-}
-
-/**
- * XState-compatible output format
- */
-export interface XStateOutput {
-  id: string;
-  initial: string;
-  context?: Record<string, unknown>;
-  states: Record<string, {
-    on?: Record<string, string | { target: string }>;
-  }>;
+  /** Custom helpers merged with built-ins (set, send) */
+  helpers?: THelpers;
 }
 
 /**
@@ -98,13 +94,10 @@ export interface BehaviorMachine<TContext = Record<string, unknown>> extends Mac
 
   /** Current context (getter) */
   readonly context: TContext;
-
-  /** Export to XState format */
-  toXState(): XStateOutput;
 }
 
 /**
- * Create a standalone state machine with behaviors
+ * Create a standalone state machine with behaviors (state-centric)
  *
  * @example
  * ```ts
@@ -114,24 +107,29 @@ export interface BehaviorMachine<TContext = Record<string, unknown>> extends Mac
  *   context: { items: 0, total: 0 },
  *
  *   states: {
- *     draft: { on: { ADD_ITEM: 'draft', SUBMIT: 'pending' } },
- *     pending: { on: { APPROVE: 'confirmed', REJECT: 'draft' } },
- *     confirmed: { on: { SHIP: 'shipped' } },
+ *     draft: {
+ *       on: { ADD_ITEM: 'draft', SUBMIT: 'pending' }
+ *     },
+ *     pending: {
+ *       entry: (ctx, { log }) => log('Order pending...'),
+ *       on: { APPROVE: 'confirmed', REJECT: 'draft' }
+ *     },
+ *     confirmed: {
+ *       entry: (ctx, { log }) => log(`Order confirmed: ${ctx.items} items`),
+ *       on: { SHIP: 'shipped' }
+ *     },
+ *     processing: {
+ *       after: { delay: 2000, send: 'COMPLETE' },
+ *       on: { COMPLETE: 'done' }
+ *     },
  *     shipped: {},
  *   },
  *
+ *   // Global event handlers (optional)
  *   on: {
  *     ADD_ITEM: (ctx, { set }) => {
  *       set({ items: ctx.items + 1, total: ctx.total + 29.99 });
  *     },
- *   },
- *
- *   onEnter: {
- *     confirmed: (ctx, { log }) => log(`Order: ${ctx.items} items`),
- *   },
- *
- *   timers: {
- *     processing: { send: 'COMPLETE', delay: 2000 },
  *   },
  * });
  *
@@ -150,10 +148,7 @@ export function createMachine<TContext = Record<string, unknown>>(
     context: initialContext,
     states,
     on: eventHandlers = {},
-    onEnter: enterHandlers = {},
-    onExit: exitHandlers = {},
-    timers = {},
-    logger = () => {},
+    helpers: customHelpers = {},
   } = config;
 
   // Create internal kernel
@@ -171,7 +166,7 @@ export function createMachine<TContext = Record<string, unknown>>(
     trackHistory: true,
   };
 
-  // Convert states
+  // Convert states (extract only transitions for base machine)
   for (const [stateName, stateDef] of Object.entries(states)) {
     machineConfig.states[stateName] = {
       on: stateDef.on ? { ...stateDef.on } : undefined,
@@ -181,64 +176,72 @@ export function createMachine<TContext = Record<string, unknown>>(
   // Create base machine
   const baseMachine = useMachine<TContext>(kernel, machineConfig);
 
-  // Create helpers factory
-  const createHelpers = (): BehaviorHelpers<TContext> => ({
-    set: (partial) => baseMachine.setContext(partial),
-    send: (event, payload) => baseMachine.send(event, payload),
-    log: logger,
+  // Create helpers factory (built-ins + custom)
+  const createHelpers = () => ({
+    // Built-ins
+    set: (partial: Partial<TContext>) => baseMachine.setContext(partial),
+    send: (event: string, payload?: unknown) => baseMachine.send(event, payload),
+    log: console.log,
+    // Custom helpers (can override built-ins)
+    ...customHelpers,
   });
 
   // Register behavior handlers
-  // onEnter handlers
+  // Entry handlers (read from each state's entry property)
   kernel.on(`${id}:enter:*`, async (e: any) => {
-    const state = e.data?.state;
-    if (!state) return;
+    const stateName = e.data?.state;
+    if (!stateName) return;
 
     // Clear any existing timer for previous state
     activeTimers.forEach((timer, key) => {
-      if (!key.startsWith(state + ':')) {
+      if (!key.startsWith(stateName + ':')) {
         clearTimeout(timer);
         activeTimers.delete(key);
       }
     });
 
-    // Call onEnter handler
-    const handler = enterHandlers[state];
-    if (handler) {
-      await handler(baseMachine.getContext(), createHelpers());
+    // Get state config
+    const stateConfig = states[stateName];
+    if (!stateConfig) return;
+
+    // Call entry handler
+    if (stateConfig.entry) {
+      await stateConfig.entry(baseMachine.getContext(), createHelpers());
     }
 
-    // Set up timer if defined
-    const timerDef = timers[state];
-    if (timerDef) {
+    // Set up after timer if defined
+    if (stateConfig.after) {
       const timerId = setTimeout(() => {
-        baseMachine.send(timerDef.send);
-        activeTimers.delete(state + ':timer');
-      }, timerDef.delay);
-      activeTimers.set(state + ':timer', timerId);
+        baseMachine.send(stateConfig.after!.send);
+        activeTimers.delete(stateName + ':timer');
+      }, stateConfig.after.delay);
+      activeTimers.set(stateName + ':timer', timerId);
     }
   });
 
-  // onExit handlers
+  // Exit handlers (read from each state's exit property)
   kernel.on(`${id}:exit:*`, async (e: any) => {
-    const state = e.data?.state;
-    if (!state) return;
+    const stateName = e.data?.state;
+    if (!stateName) return;
 
     // Clear timer
-    const timerId = activeTimers.get(state + ':timer');
+    const timerId = activeTimers.get(stateName + ':timer');
     if (timerId) {
       clearTimeout(timerId);
-      activeTimers.delete(state + ':timer');
+      activeTimers.delete(stateName + ':timer');
     }
 
-    // Call onExit handler
-    const handler = exitHandlers[state];
-    if (handler) {
-      await handler(baseMachine.getContext(), createHelpers());
+    // Get state config
+    const stateConfig = states[stateName];
+    if (!stateConfig) return;
+
+    // Call exit handler
+    if (stateConfig.exit) {
+      await stateConfig.exit(baseMachine.getContext(), createHelpers());
     }
   });
 
-  // Event (on) handlers
+  // Global event handlers
   kernel.on(`${id}:transition`, async (e: any) => {
     const event = e.data?.event;
     if (!event) return;
@@ -260,30 +263,6 @@ export function createMachine<TContext = Record<string, unknown>>(
 
     get context() {
       return baseMachine.getContext();
-    },
-
-    toXState(): XStateOutput {
-      const xstate = toXStateFormat(machineConfig);
-      return {
-        id: xstate.id || id,
-        initial: xstate.initial,
-        context: xstate.context,
-        states: Object.fromEntries(
-          Object.entries(xstate.states).map(([name, state]) => [
-            name,
-            {
-              on: state.on
-                ? Object.fromEntries(
-                    Object.entries(state.on).map(([event, target]) => [
-                      event,
-                      typeof target === 'string' ? target : { target: (target as any).target },
-                    ])
-                  )
-                : undefined,
-            },
-          ])
-        ),
-      };
     },
 
     destroy() {

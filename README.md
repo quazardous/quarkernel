@@ -20,9 +20,9 @@ TypeScript-first. Zero dependencies. < 2KB gzipped.
 emitter.emit('user:login', data);
 
 // QuarKernel: orchestrate with confidence
-kernel.on('user:login', fetchUser, { id: 'fetch' });
-kernel.on('user:login', logAnalytics, { after: ['fetch'] }); // Guaranteed order
-kernel.on('user:login', (e) => greet(e.context.user));       // Shared context
+qk.on('user:login', fetchUser, { id: 'fetch' });
+qk.on('user:login', logAnalytics, { after: ['fetch'] }); // Guaranteed order
+qk.on('user:login', (e) => greet(e.context.user));       // Shared context
 ```
 
 **What makes it different:**
@@ -57,19 +57,19 @@ npm install @quazardous/quarkernel
 ```typescript
 import { createKernel } from '@quazardous/quarkernel';
 
-const kernel = createKernel();
+const qk = createKernel();
 
 // 1. Dependency ordering - control execution sequence
-kernel.on('checkout', async (e) => {
+qk.on('checkout', async (e) => {
   e.context.inventory = await checkStock(e.data.items);
 }, { id: 'stock' });
 
-kernel.on('checkout', async (e) => {
+qk.on('checkout', async (e) => {
   // Runs AFTER stock check - guaranteed
   await processPayment(e.data.card, e.context.inventory);
 }, { after: ['stock'] });
 
-await kernel.emit('checkout', { items: ['sku-123'], card: 'tok_visa' });
+await qk.emit('checkout', { items: ['sku-123'], card: 'tok_visa' });
 ```
 
 ```typescript
@@ -77,18 +77,18 @@ await kernel.emit('checkout', { items: ['sku-123'], card: 'tok_visa' });
 import { Composition } from '@quazardous/quarkernel';
 
 const checkout = new Composition([
-  [kernel, 'cart:ready'],
-  [kernel, 'payment:confirmed']
+  [qk, 'cart:ready'],
+  [qk, 'payment:confirmed']
 ]);
 
-checkout.on('composite', () => {
+checkout.onComposed(() => {
   console.log('Both events fired - proceed to shipping!');
 });
 ```
 
 ```typescript
 // 3. Wildcards - catch event patterns
-kernel.on('user:*', (e) => console.log('User action:', e.name));
+qk.on('user:*', (e) => console.log('User action:', e.name));
 // Matches: user:login, user:logout, user:signup...
 ```
 
@@ -138,7 +138,7 @@ Official bindings with auto-cleanup on unmount:
 | Package | Framework | Docs |
 |---------|-----------|------|
 | `@quazardous/quarkernel-vue` | Vue 3 | [README](./packages/vue/README.md) |
-| `@quarkernel/react` | React 18+ | [README](./packages/react/README.md) |
+| `@quazardous/quarkernel-react` | React 18+ | [README](./packages/react/README.md) |
 | `@quazardous/quarkernel-svelte` | Svelte 5 | [README](./packages/svelte/README.md) |
 
 ```bash
@@ -146,7 +146,7 @@ Official bindings with auto-cleanup on unmount:
 npm install @quazardous/quarkernel @quazardous/quarkernel-vue
 
 # React
-npm install @quazardous/quarkernel @quarkernel/react
+npm install @quazardous/quarkernel @quazardous/quarkernel-react
 
 # Svelte
 npm install @quazardous/quarkernel @quazardous/quarkernel-svelte
@@ -159,6 +159,8 @@ npm install @quazardous/quarkernel @quazardous/quarkernel-svelte
 **Guides:**
 - [Getting Started](./docs/getting-started.md) - Installation, first event, basic usage
 - [API Reference](./docs/api-reference.md) - Complete API documentation
+- [Advanced Patterns](./docs/advanced-qk.md) - Multi-machine, composition, sagas
+- [Async Integration](./docs/async-patterns.md) - QK + FSM + Promises synergies
 - [Migration v1 to v2](./docs/migration-v1-to-v2.md) - Upgrade guide
 
 **Packages:**

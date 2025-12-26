@@ -26,7 +26,7 @@ npm install @quazardous/quarkernel @quazardous/quarkernel-svelte
   import { createKernel } from '@quazardous/quarkernel';
   import { setKernel } from '@quazardous/quarkernel-svelte';
 
-  const kernel = createKernel();
+  const qk = createKernel();
   setKernel(kernel);
 </script>
 
@@ -41,7 +41,7 @@ npm install @quazardous/quarkernel @quazardous/quarkernel-svelte
   import { getKernel, onEvent } from '@quazardous/quarkernel-svelte';
 
   // Get kernel from context
-  const kernel = getKernel();
+  const qk = getKernel();
 
   // Register listener with auto-cleanup
   onEvent('user:login', async (event) => {
@@ -50,7 +50,7 @@ npm install @quazardous/quarkernel @quazardous/quarkernel-svelte
 
   // Manual emit
   function handleClick() {
-    kernel.emit('button:clicked', { timestamp: Date.now() });
+    qk.emit('button:clicked', { timestamp: Date.now() });
   }
 </script>
 

@@ -48,7 +48,7 @@ describe('Composition', () => {
       ]);
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { count: 1 });
       await profileKernel.emit('profile:loaded', { count: 2 });
@@ -69,7 +69,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { count: 1 });
       await profileKernel.emit('profile:loaded', { count: 2 });
@@ -110,7 +110,7 @@ describe('Composition', () => {
 
     it('emits composite event when all sources fire', async () => {
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { userId: 123 });
       expect(listener).not.toHaveBeenCalled();
@@ -121,7 +121,7 @@ describe('Composition', () => {
 
     it('includes all source contexts in composite event', async () => {
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { userId: 123 });
       await profileKernel.emit('profile:loaded', { profileId: 456 });
@@ -135,7 +135,7 @@ describe('Composition', () => {
 
     it('merges contexts using configured merger', async () => {
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       // Add context through listeners
       userKernel.on('user:loaded', (e) => {
@@ -161,7 +161,7 @@ describe('Composition', () => {
       // With reset=true (default), composition requires all sources to fire in each cycle
       // So subsequent emissions wait for all sources before emitting
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { v: 1 });
       await profileKernel.emit('profile:loaded', { v: 1 });
@@ -178,7 +178,7 @@ describe('Composition', () => {
 
     it('uses latest event from each source for merging', async () => {
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       userKernel.on('user:loaded', (e) => {
         e.context.value = e.data.value;
@@ -245,7 +245,7 @@ describe('Composition', () => {
 
     it('resets buffers after composite emission by default', async () => {
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { v: 1 });
       await profileKernel.emit('profile:loaded', { v: 1 });
@@ -270,7 +270,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { v: 1 });
       await profileKernel.emit('profile:loaded', { v: 1 });
@@ -332,7 +332,7 @@ describe('Composition', () => {
 
     it('does not trigger composite event emission', async () => {
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', {});
       await profileKernel.emit('profile:loaded', {});
@@ -355,7 +355,7 @@ describe('Composition', () => {
 
     it('supports on() for registering listeners', async () => {
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', {});
       await profileKernel.emit('profile:loaded', {});
@@ -365,7 +365,7 @@ describe('Composition', () => {
 
     it('returns unbind function from on()', async () => {
       const listener = vi.fn();
-      const unbind = composition.on('composite', listener);
+      const unbind = composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', {});
       await profileKernel.emit('profile:loaded', {});
@@ -379,16 +379,16 @@ describe('Composition', () => {
       expect(listener).not.toHaveBeenCalled();
     });
 
-    it('supports off() for removing listeners', async () => {
+    it('supports offComposed() for removing specific listener', async () => {
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', {});
       await profileKernel.emit('profile:loaded', {});
 
       expect(listener).toHaveBeenCalledTimes(1);
 
-      composition.off('composite', listener);
+      composition.offComposed(listener);
       listener.mockClear();
 
       await userKernel.emit('user:loaded', {});
@@ -405,35 +405,43 @@ describe('Composition', () => {
       expect(listener.mock.calls[0][0].data).toEqual({ test: 'data' });
     });
 
-    it('supports listenerCount()', () => {
-      expect(composition.listenerCount('composite')).toBe(0);
+    it('blocks emit() of reserved internal events', async () => {
+      await expect(composition.emit('__qk:composed__' as any, {}))
+        .rejects.toThrow('Cannot emit reserved event');
 
-      composition.on('composite', () => {});
-      expect(composition.listenerCount('composite')).toBe(1);
-
-      composition.on('composite', () => {});
-      expect(composition.listenerCount('composite')).toBe(2);
+      await expect(composition.emit('__qk:anything__' as any, {}))
+        .rejects.toThrow('Cannot emit reserved event');
     });
 
-    it('supports eventNames()', () => {
+    it('supports composedListenerCount()', () => {
+      expect(composition.composedListenerCount()).toBe(0);
+
+      composition.onComposed(() => {});
+      expect(composition.composedListenerCount()).toBe(1);
+
+      composition.onComposed(() => {});
+      expect(composition.composedListenerCount()).toBe(2);
+    });
+
+    it('supports eventNames() for custom events', () => {
       expect(composition.eventNames()).toEqual([]);
 
-      composition.on('composite', () => {});
       composition.on('custom', () => {});
+      composition.on('other', () => {});
 
       const names = composition.eventNames();
-      expect(names).toContain('composite');
       expect(names).toContain('custom');
+      expect(names).toContain('other');
     });
 
-    it('supports offAll()', async () => {
+    it('supports offComposed()', async () => {
       const listener1 = vi.fn();
       const listener2 = vi.fn();
 
-      composition.on('composite', listener1);
-      composition.on('composite', listener2);
+      composition.onComposed(listener1);
+      composition.onComposed(listener2);
 
-      composition.offAll('composite');
+      composition.offComposed();
 
       await userKernel.emit('user:loaded', {});
       await profileKernel.emit('profile:loaded', {});
@@ -458,7 +466,7 @@ describe('Composition', () => {
 
     it('unsubscribes from all source kernels', async () => {
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', {});
       await profileKernel.emit('profile:loaded', {});
@@ -474,7 +482,7 @@ describe('Composition', () => {
 
     it('clears all listeners on internal kernel', async () => {
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       composition.dispose();
 
@@ -508,7 +516,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       userKernel.on('user:loaded', (e) => {
         e.context.status = 'user';
@@ -537,7 +545,7 @@ describe('Composition', () => {
       ]);
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', {});
       await profileKernel.emit('profile:loaded', {});
@@ -556,7 +564,7 @@ describe('Composition', () => {
       composition = createComposition([[userKernel, 'user:loaded']]);
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { test: true });
 
@@ -604,7 +612,7 @@ describe('Composition', () => {
       ]);
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       // Trigger the circular reference
       await kernelA.emit('event-a', { initial: true });
@@ -626,7 +634,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       userKernel.on('user:loaded', (e) => {
         e.context.status = 'active';
@@ -660,7 +668,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       userKernel.on('user:loaded', (e) => {
         e.context.status = 'active';
@@ -697,7 +705,7 @@ describe('Composition', () => {
       ]);
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await kernel1.emit('event1', {});
       await kernel2.emit('event2', {});
@@ -717,7 +725,7 @@ describe('Composition', () => {
       ]);
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       for (let i = 0; i < 10; i++) {
         await userKernel.emit('user:loaded', { i });
@@ -768,7 +776,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { user: 'test' });
 
@@ -790,7 +798,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { user: 'test' });
 
@@ -817,7 +825,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       // First cycle - user fires, expires, profile fires (no composite)
       await userKernel.emit('user:loaded', { user: 'test1' });
@@ -858,7 +866,7 @@ describe('Composition', () => {
       ]);
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { user: 'test' });
 
@@ -881,7 +889,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       // Fire multiple user events
       await userKernel.emit('user:loaded', { v: 1 });
@@ -948,7 +956,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { user: 'test' });
 
@@ -976,7 +984,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       await userKernel.emit('user:loaded', { user: 'test' });
 
@@ -1003,7 +1011,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       // Fire user:loaded first - it's instant so it won't wait
       await userKernel.emit('user:loaded', { user: 'first' });
@@ -1033,7 +1041,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       // Fire profile:loaded first (permanent by default)
       await profileKernel.emit('profile:loaded', { profile: 'test' });
@@ -1066,7 +1074,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       // Fire permanent event
       await userKernel.emit('user:loaded', { user: 'test' });
@@ -1102,7 +1110,7 @@ describe('Composition', () => {
       );
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       // Only user fires
       await userKernel.emit('user:loaded', { user: 'test' });
@@ -1182,7 +1190,7 @@ describe('Composition', () => {
       ]);
 
       const listener = vi.fn();
-      composition.on('composite', listener);
+      composition.onComposed(listener);
 
       // Initially no TTL - event stays forever
       await userKernel.emit('user:loaded', { user: 'test' });

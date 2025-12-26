@@ -1,6 +1,6 @@
 {
   "name": "@quazardous/quarkernel",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "type": "module",
   "description": "Micro Custom Events Kernel with dependency ordering, shared context, and composite events",
   "author": "quazardous <berliozdavid@gmail.com>",
@@ -37,6 +37,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./fsm": {
+      "types": "./dist/fsm.d.ts",
+      "import": "./dist/fsm.js",
+      "require": "./dist/fsm.cjs"
+    },
+    "./xstate": {
+      "types": "./dist/xstate.d.ts",
+      "import": "./dist/xstate.js",
+      "require": "./dist/xstate.cjs"
     }
   },
   "main": "./dist/index.cjs",

@@ -1,92 +1,179 @@
 # QuarKernel FSM
 
-High-level state machine abstraction with XState compatibility.
+State machine abstraction with state-centric format.
 
 ## Two APIs
 
 | API | Use Case |
 |-----|----------|
-| `createMachine()` | Standalone, self-contained, high-level behaviors |
-| `useMachine()` | With external kernel, event orchestration, multi-machine |
+| `createMachine()` | Standalone, self-contained, behaviors inline |
+| `useMachine()` | With external kernel, event orchestration |
 
 ---
 
 ## 1. Standalone: `createMachine()`
 
-Self-contained machine with declarative behaviors.
+Self-contained machine with **state-centric** behaviors (entry/exit/after inside each state).
 
 ```typescript
 import { createMachine } from '@quazardous/quarkernel/fsm';
 
+const trafficLight = createMachine({
+  id: 'trafficLight',
+  initial: 'green',
+  context: {},
+
+  states: {
+    green: {
+      entry: (ctx, { log }) => log('GREEN'),
+      after: { delay: 3000, send: 'TIMER' },
+      on: { TIMER: 'yellow' },
+    },
+    yellow: {
+      entry: (ctx, { log }) => log('YELLOW'),
+      after: { delay: 1000, send: 'TIMER' },
+      on: { TIMER: 'red' },
+    },
+    red: {
+      entry: (ctx, { log }) => log('RED'),
+      after: { delay: 2000, send: 'TIMER' },
+      on: { TIMER: 'green' },
+    },
+  },
+});
+
+trafficLight.send('TIMER'); // green → yellow
+console.log(trafficLight.state); // 'yellow'
+```
+
+### State Config
+
+Each state can have:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `entry` | `(ctx, helpers) => void` | Called when entering state |
+| `exit` | `(ctx, helpers) => void` | Called when exiting state |
+| `after` | `{ delay: number, send: string }` | Auto-send event after delay |
+| `on` | `Record<string, string>` | Transitions: `{ EVENT: 'targetState' }` |
+
+### Behavior Helpers
+
+Callbacks `entry` and `exit` receive `(ctx, helpers)`:
+
+```typescript
+entry: (ctx, { set, send }) => {
+  // ctx: current context (read-only snapshot)
+  set({ count: ctx.count + 1 });  // Merge into context
+  send('NEXT');                    // Trigger transition
+}
+```
+
+**Built-in helpers** (always available):
+
+| Helper | Description |
+|--------|-------------|
+| `set(obj)` | Merge object into context: `set({ count: 5 })` |
+| `send(event)` | Trigger a transition: `send('NEXT')` |
+| `log(msg)` | Log message (default: `console.log`) |
+
+**Custom helpers** via `helpers` config (can override built-ins):
+
+```typescript
+const machine = createMachine({
+  id: 'test',
+  initial: 'idle',
+  helpers: {
+    log: console.log,
+    notify: (msg) => toast.show(msg),
+    track: (event) => analytics.track(event),
+  },
+  states: {
+    idle: {
+      entry: (ctx, { log }) => log('Entered idle'),
+      exit: (ctx, { notify }) => notify('Leaving idle'),
+    },
+    active: {
+      entry: (ctx, { set, track }) => {
+        set({ activatedAt: Date.now() });
+        track('state:active');
+      },
+    },
+  },
+});
+```
+
+### Global Event Handlers
+
+Handle events at machine level (not state-specific):
+
+```typescript
 const order = createMachine({
   id: 'order',
   initial: 'draft',
   context: { items: 0, total: 0 },
 
-  // State definitions (XState-compatible)
   states: {
-    draft:     { on: { ADD_ITEM: 'draft', SUBMIT: 'pending' } },
-    pending:   { on: { APPROVE: 'confirmed', REJECT: 'draft' } },
-    confirmed: { on: { SHIP: 'shipped' } },
-    shipped:   { on: { DELIVER: 'delivered' } },
-    delivered: {},
+    draft: { on: { ADD_ITEM: 'draft', SUBMIT: 'pending' } },
+    pending: { on: { APPROVE: 'confirmed' } },
+    confirmed: {
+      entry: (ctx, { log }) => log(`Confirmed: ${ctx.items} items`),
+    },
   },
 
-  // Event handlers - called when event triggers transition
+  // Global: called on ANY transition with this event
   on: {
     ADD_ITEM: (ctx, { set, log }) => {
       set({ items: ctx.items + 1, total: ctx.total + 29.99 });
-      log(`Added item. Total: ${ctx.items + 1}`);
+      log(`Item added. Total: $${ctx.total + 29.99}`);
     },
   },
-
-  // State entry handlers
-  onEnter: {
-    confirmed: (ctx, { log }) => {
-      log(`Order confirmed: ${ctx.items} items, $${ctx.total}`);
-    },
-    shipped: (ctx, { log }) => {
-      log('Package shipped!');
-    },
-  },
-
-  // State exit handlers
-  onExit: {
-    draft: (ctx, { log }) => {
-      log('Leaving draft state');
-    },
-  },
-
-  // Auto-timers (trigger event after delay)
-  timers: {
-    processing: { send: 'COMPLETE', delay: 2000 },
-  },
-
-  // Optional logger
-  logger: console.log,
 });
-
-// Usage
-order.send('ADD_ITEM');
-order.send('SUBMIT');
-
-console.log(order.state);   // 'pending'
-console.log(order.context); // { items: 1, total: 29.99 }
-
-// Export to XState
-console.log(order.toXState());
 ```
 
-### Behavior Helpers
+---
 
-Callbacks receive `(ctx, helpers)`:
+## File Format
 
-| Helper | Description |
-|--------|-------------|
-| `ctx` | Current context (read-only snapshot) |
-| `set(obj)` | Merge object into context |
-| `send(event)` | Trigger a transition |
-| `log(msg)` | Log message (if logger provided) |
+Save machines as ES modules:
+
+```javascript
+// trafficLight.js
+export default {
+  id: 'trafficLight',
+  initial: 'green',
+  context: {},
+  states: {
+    green: {
+      entry: (ctx, { log }) => log('GREEN'),
+      after: { delay: 3000, send: 'TIMER' },
+      on: { TIMER: 'yellow' },
+    },
+    yellow: {
+      entry: (ctx, { log }) => log('YELLOW'),
+      after: { delay: 1000, send: 'TIMER' },
+      on: { TIMER: 'red' },
+    },
+    red: {
+      entry: (ctx, { log }) => log('RED'),
+      after: { delay: 2000, send: 'TIMER' },
+      on: { TIMER: 'green' },
+    },
+  },
+};
+```
+
+Load and use:
+
+```javascript
+import { createMachine } from '@quazardous/quarkernel/fsm';
+import trafficLightConfig from './trafficLight.js';
+
+const machine = createMachine({
+  ...trafficLightConfig,
+  logger: console.log,
+});
+```
 
 ---
 
@@ -97,12 +184,11 @@ For multi-machine orchestration and event listeners.
 ```typescript
 import { Kernel, useMachine } from '@quazardous/quarkernel';
 
-const kernel = new Kernel();
+const qk = new Kernel();
 
-const order = useMachine(kernel, {
-  prefix: 'order',  // Event prefix
+const order = useMachine(qk, {
+  prefix: 'order',
   initial: 'draft',
-  context: { items: 0 },
   states: {
     draft:     { on: { SUBMIT: 'pending' } },
     pending:   { on: { APPROVE: 'confirmed' } },
@@ -110,34 +196,30 @@ const order = useMachine(kernel, {
   },
 });
 
-const payment = useMachine(kernel, {
+const payment = useMachine(qk, {
   prefix: 'payment',
   initial: 'pending',
   states: {
     pending:    { on: { PROCESS: 'processing' } },
     processing: { on: { SUCCESS: 'paid', FAIL: 'failed' } },
     paid:       {},
-    failed:     { on: { RETRY: 'processing' } },
+    failed:     {},
   },
 });
 
-// Listen to events
-kernel.on('order:enter:confirmed', async () => {
+// Cross-machine orchestration
+qk.on('order:enter:confirmed', async () => {
   console.log('Order confirmed, processing payment...');
   await payment.send('PROCESS');
 });
 
-kernel.on('payment:enter:paid', () => {
+qk.on('payment:enter:paid', () => {
   console.log('Payment successful!');
 });
 
 // Wildcards
-kernel.on('*:transition', (e) => {
+qk.on('*:transition', (e) => {
   console.log(`[${e.data.machine}] ${e.data.from} → ${e.data.to}`);
-});
-
-kernel.on('order:*', (e) => {
-  console.log('Order event:', e.name);
 });
 ```
 
@@ -147,82 +229,12 @@ kernel.on('order:*', (e) => {
 
 Events emitted on the kernel (for `useMachine`):
 
-| Event Pattern | When | Data |
-|---------------|------|------|
-| `{prefix}:enter:{state}` | Entering a state | `{ state, from?, to?, event? }` |
-| `{prefix}:exit:{state}` | Exiting a state | `{ state, from, to, event }` |
-| `{prefix}:transition` | Any transition | `{ from, to, event, payload? }` |
-| `{prefix}:transition:{event}` | Specific event | `{ from, to, event, payload? }` |
-| `{prefix}:guard:rejected` | Guard blocked | `{ state, event }` |
-
-### Examples
-
-```typescript
-// Specific state
-kernel.on('order:enter:confirmed', handler);
-kernel.on('order:exit:draft', handler);
-
-// Any state (wildcard)
-kernel.on('order:enter:*', handler);
-
-// Any machine
-kernel.on('*:transition', handler);
-
-// Specific transition event
-kernel.on('order:transition:SUBMIT', handler);
-```
-
----
-
-## XState Compatibility
-
-### Export to XState
-
-```typescript
-// From createMachine
-const xstate = order.toXState();
-// {
-//   id: 'order',
-//   initial: 'draft',
-//   context: { items: 0, total: 0 },
-//   states: {
-//     draft: { on: { ADD_ITEM: 'draft', SUBMIT: 'pending' } },
-//     ...
-//   }
-// }
-
-// From useMachine
-import { toXStateFormat } from '@quazardous/quarkernel/fsm';
-const xstate = toXStateFormat(machineConfig);
-```
-
-### Import from XState
-
-```typescript
-import { fromXState, useMachine } from '@quazardous/quarkernel/fsm';
-
-const xstateConfig = {
-  id: 'player',
-  initial: 'stopped',
-  states: {
-    stopped: { on: { PLAY: 'playing' } },
-    playing: { on: { PAUSE: 'paused', STOP: 'stopped' } },
-    paused:  { on: { PLAY: 'playing', STOP: 'stopped' } },
-  },
-};
-
-const config = fromXState(xstateConfig, {
-  prefix: 'player',
-  guards: {
-    canPlay: (ctx) => ctx.hasPermission,
-  },
-  actions: {
-    logPlay: (ctx) => console.log('Playing!'),
-  },
-});
-
-const player = useMachine(kernel, config);
-```
+| Event Pattern | When |
+|---------------|------|
+| `{prefix}:enter:{state}` | Entering a state |
+| `{prefix}:exit:{state}` | Exiting a state |
+| `{prefix}:transition` | Any transition |
+| `{prefix}:transition:{event}` | Specific event |
 
 ---
 
@@ -235,37 +247,30 @@ const player = useMachine(kernel, config);
 | `id` | `string` | Machine identifier |
 | `initial` | `string` | Initial state |
 | `context` | `object` | Initial context |
-| `states` | `Record<string, StateNode>` | State definitions |
-| `on` | `Record<string, BehaviorFn>` | Event handlers |
-| `onEnter` | `Record<string, BehaviorFn>` | Entry handlers |
-| `onExit` | `Record<string, BehaviorFn>` | Exit handlers |
-| `timers` | `Record<string, TimerDef>` | Auto-timers |
-| `logger` | `(msg: string) => void` | Logger function |
+| `states` | `Record<string, StateConfig>` | State definitions with entry/exit/after/on |
+| `on` | `Record<string, BehaviorFn>` | Global event handlers |
+| `helpers` | `object` | Custom helpers (merged with built-ins) |
 
-Returns `BehaviorMachine`:
+### `StateConfig`
 
-| Property/Method | Description |
-|-----------------|-------------|
-| `.state` | Current state |
-| `.context` | Current context |
-| `.send(event, payload?)` | Trigger transition |
-| `.can(event)` | Check if transition valid |
-| `.transitions()` | Get available events |
-| `.toXState()` | Export to XState format |
-| `.toJSON()` | Serialize state |
-| `.restore(snapshot)` | Restore from snapshot |
-| `.destroy()` | Cleanup |
+| Property | Type | Description |
+|----------|------|-------------|
+| `entry` | `BehaviorFn` | Called on state entry |
+| `exit` | `BehaviorFn` | Called on state exit |
+| `after` | `{ delay, send }` | Auto-transition after delay |
+| `on` | `Record<string, string>` | Event → target state |
 
-### `useMachine(kernel, config)`
+### `BehaviorFn`
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `prefix` | `string` | Event prefix |
-| `initial` | `string` | Initial state |
-| `context` | `object` | Initial context |
-| `states` | `Record<string, StateNode>` | State definitions |
-| `allowForce` | `boolean` | Allow force transitions |
-| `trackHistory` | `boolean` | Track history |
-| `snapshot` | `MachineSnapshot` | Restore from snapshot |
+```typescript
+type BehaviorFn = (ctx: Context, helpers: BehaviorHelpers) => void;
 
-Returns `Machine` with same methods.
+// Built-in helpers (always available)
+interface BuiltInHelpers {
+  set: (partial: Partial<Context>) => void;
+  send: (event: string) => void;
+  log: (message: string) => void;  // default: console.log
+}
+
+// BehaviorHelpers = BuiltInHelpers + custom helpers from config
+```

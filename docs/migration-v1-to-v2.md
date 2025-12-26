@@ -33,7 +33,7 @@ QuarKernel v2 offers significant improvements:
 | Category | v1 | v2 | Impact |
 |----------|----|----|--------|
 | **Class name** | `QuarKernel` | `createKernel()` factory | HIGH |
-| **Event creation** | `new QuarKernelEvent(type, param, context)` | `kernel.emit(type, data)` | HIGH |
+| **Event creation** | `new QuarKernelEvent(type, param, context)` | `qk.emit(type, data)` | HIGH |
 | **Listener registration** | `addEventListener(type, cb, target, deps)` | `on(type, cb, { id, after })` | HIGH |
 | **Event dispatch** | `dispatchEvent(event)` | `emit(eventName, data)` | HIGH |
 | **Event object** | `e.param`, `e.context` | `e.data`, `e.context` | MEDIUM |
@@ -78,7 +78,7 @@ import { createKernel } from '@quazardous/quarkernel';
 const qk = new QuarKernel();
 
 // v2
-const kernel = createKernel();
+const qk = createKernel();
 ```
 
 ### Step 4: Update Event Listeners
@@ -112,14 +112,14 @@ const qk = new QuarKernel();
 **v2:**
 ```typescript
 import { createKernel } from '@quazardous/quarkernel';
-const kernel = createKernel();
+const qk = createKernel();
 
 // With TypeScript types
 interface Events {
   'user:login': { userId: string };
   'user:logout': { userId: string };
 }
-const kernel = createKernel<Events>();
+const qk = createKernel<Events>();
 ```
 
 **Migration notes:**
@@ -150,16 +150,16 @@ qk.addEventListener('my_event', (e) => {
 **v2:**
 ```typescript
 // Basic listener
-const unbind = kernel.on('my_event', (event, ctx) => {
+const unbind = qk.on('my_event', (event, ctx) => {
   console.log(event.data);
 });
 
 // Named listener with dependencies
-kernel.on('my_event', async (event, ctx) => {
+qk.on('my_event', async (event, ctx) => {
   event.context.needed = await fetchData();
 }, { id: 'foo' });
 
-kernel.on('my_event', (event, ctx) => {
+qk.on('my_event', (event, ctx) => {
   useData(event.context.needed);
 }, { id: 'bar', after: 'foo' });  // bar depends on foo
 ```
@@ -192,13 +192,13 @@ await qk.dispatchEvent(event2);
 **v2:**
 ```typescript
 // Dispatch with data
-await kernel.emit('my_event', { userId: '123' });
+await qk.emit('my_event', { userId: '123' });
 
 // Context is created automatically, mutate in listeners
-kernel.on('my_event', (event, ctx) => {
+qk.on('my_event', (event, ctx) => {
   event.context.custom = 'data';  // Listeners modify context
 });
-await kernel.emit('my_event', { userId: '123' });
+await qk.emit('my_event', { userId: '123' });
 ```
 
 **Migration notes:**
@@ -224,7 +224,7 @@ qk.addEventListener('event', (e, target) => {
 
 **v2:**
 ```typescript
-kernel.on('event', (event, ctx) => {
+qk.on('event', (event, ctx) => {
   console.log(event.name);      // Event name (changed from 'type')
   console.log(event.data);      // Event data (changed from 'param')
   console.log(event.context);   // Shared mutable context
@@ -261,16 +261,16 @@ qk.addEventListener('event', handler);
 **v2:**
 ```typescript
 // Unbind function returned
-const unbind = kernel.on('event', handler);
+const unbind = qk.on('event', handler);
 
 // Later: clean up
 unbind();
 
 // Or remove all listeners for event
-kernel.off('event');
+qk.off('event');
 
 // Or remove all listeners
-kernel.offAll();
+qk.offAll();
 ```
 
 **Migration notes:**
@@ -294,7 +294,7 @@ qk.dispatchEvent(new QKE('B'));  // Auto-dispatches C
 
 **v2:**
 ```typescript
-kernel.compose(['A', 'B'], (events) => ({
+qk.compose(['A', 'B'], (events) => ({
   type: 'C',
   data: {
     fromA: events['A'][0].data,
@@ -302,8 +302,8 @@ kernel.compose(['A', 'B'], (events) => ({
   }
 }));
 
-await kernel.emit('A', { x: 1 });
-await kernel.emit('B', { y: 2 });  // Auto-emits C
+await qk.emit('A', { x: 1 });
+await qk.emit('B', { y: 2 });  // Auto-emits C
 ```
 
 **Migration notes:**
@@ -320,19 +320,19 @@ await kernel.emit('B', { y: 2 });  // Auto-emits C
 import { NamespacedMerger, DeepMerger } from '@quazardous/quarkernel';
 
 // Keep contexts separate by event name (recommended)
-kernel.compose(['A', 'B'], factory, {
+qk.compose(['A', 'B'], factory, {
   contextMerger: new NamespacedMerger()
   // Result: { 'A': { ... }, 'B': { ... } }
 });
 
 // Deep merge contexts
-kernel.compose(['A', 'B'], factory, {
+qk.compose(['A', 'B'], factory, {
   contextMerger: new DeepMerger()
   // Result: merged nested objects
 });
 
 // Custom merger
-kernel.compose(['A', 'B'], factory, {
+qk.compose(['A', 'B'], factory, {
   contextMerger: (contexts) => ({ custom: 'merge' })
 });
 ```
@@ -351,19 +351,19 @@ kernel.compose(['A', 'B'], factory, {
 **v2:**
 ```typescript
 // Listen to all user events
-kernel.on('user:*', (event, ctx) => {
+qk.on('user:*', (event, ctx) => {
   console.log(`User event: ${event.name}`);
 });
 
 // Listen to everything
-kernel.on('**', (event, ctx) => {
+qk.on('**', (event, ctx) => {
   console.log(`Any event: ${event.name}`);
 });
 
 // Emitted events match patterns
-await kernel.emit('user:login', {});    // Matches 'user:*' and '**'
-await kernel.emit('user:logout', {});   // Matches 'user:*' and '**'
-await kernel.emit('config:load', {});   // Matches '**' only
+await qk.emit('user:login', {});    // Matches 'user:*' and '**'
+await qk.emit('user:logout', {});   // Matches 'user:*' and '**'
+await qk.emit('config:load', {});   // Matches '**' only
 ```
 
 **Migration notes:**
@@ -381,7 +381,7 @@ await kernel.emit('config:load', {});   // Matches '**' only
 const controller = new AbortController();
 
 // Auto-cleanup when signal aborts
-kernel.on('event', handler, {
+qk.on('event', handler, {
   signal: controller.signal
 });
 
@@ -429,21 +429,21 @@ interface Events {
   'my_event': { id: string };
 }
 
-const kernel = createKernel<Events>();
+const qk = createKernel<Events>();
 
-kernel.on('my_event', (event, ctx) => {
+qk.on('my_event', (event, ctx) => {
   console.log('Received:', event.data);
 });
 
-kernel.on('my_event', async (event, ctx) => {
+qk.on('my_event', async (event, ctx) => {
   event.context.result = await fetchData(event.data);
 }, { id: 'fetcher' });
 
-kernel.on('my_event', (event, ctx) => {
+qk.on('my_event', (event, ctx) => {
   saveData(event.context.result);
 }, { id: 'saver', after: 'fetcher' });
 
-await kernel.emit('my_event', { id: '123' });
+await qk.emit('my_event', { id: '123' });
 ```
 
 ---
@@ -483,9 +483,9 @@ interface Events {
   'app:ready': { config: any; user: any };
 }
 
-const kernel = createKernel<Events>();
+const qk = createKernel<Events>();
 
-kernel.compose(['config:loaded', 'user:authenticated'], (events) => ({
+qk.compose(['config:loaded', 'user:authenticated'], (events) => ({
   type: 'app:ready',
   data: {
     config: events['config:loaded'][0].data,
@@ -495,12 +495,12 @@ kernel.compose(['config:loaded', 'user:authenticated'], (events) => ({
   contextMerger: new NamespacedMerger()  // Explicit merge strategy
 });
 
-kernel.on('app:ready', (event, ctx) => {
+qk.on('app:ready', (event, ctx) => {
   startApp(event.data.config, event.data.user);
 });
 
-await kernel.emit('config:loaded', { apiUrl: '...' });
-await kernel.emit('user:authenticated', { userId: '123' });
+await qk.emit('config:loaded', { apiUrl: '...' });
+await qk.emit('user:authenticated', { userId: '123' });
 // 'app:ready' auto-emitted
 ```
 
@@ -532,7 +532,7 @@ class Component {
   private unbind?: () => void;
 
   mount() {
-    this.unbind = kernel.on('event', (event, ctx) => {
+    this.unbind = qk.on('event', (event, ctx) => {
       this.handleEvent(event);
     });
   }
@@ -547,7 +547,7 @@ class Component {
   private controller = new AbortController();
 
   mount() {
-    kernel.on('event', (event, ctx) => {
+    qk.on('event', (event, ctx) => {
       this.handleEvent(event);
     }, { signal: this.controller.signal });
   }
@@ -582,9 +582,9 @@ qk.addEventListener('event', handler3, 'C', 'A');  // Single dependency
 
 **v2:**
 ```typescript
-kernel.on('event', handler1, { id: 'A' });
-kernel.on('event', handler2, { id: 'B' });
-kernel.on('event', handler3, { id: 'C', after: ['A', 'B'] });  // Multiple deps
+qk.on('event', handler1, { id: 'A' });
+qk.on('event', handler2, { id: 'B' });
+qk.on('event', handler3, { id: 'C', after: ['A', 'B'] });  // Multiple deps
 ```
 
 ---
@@ -595,20 +595,20 @@ kernel.on('event', handler3, { id: 'C', after: ['A', 'B'] });  // Multiple deps
 
 ```typescript
 // Parallel (default) - all listeners start concurrently
-await kernel.emit('event', data);
+await qk.emit('event', data);
 
 // Serial - wait for each listener before starting next
-await kernel.emitSerial('event', data);
+await qk.emitSerial('event', data);
 ```
 
 ### 2. Once with Predicate
 
 ```typescript
 // Wait for event with condition
-await kernel.once('user:update', (event) => event.data.role === 'admin');
+await qk.once('user:update', (event) => event.data.role === 'admin');
 
 // Or as listener
-kernel.once('event', (event) => event.data.ready, (event, ctx) => {
+qk.once('event', (event) => event.data.ready, (event, ctx) => {
   console.log('Ready!');
 });
 ```
@@ -617,7 +617,7 @@ kernel.once('event', (event) => event.data.ready, (event, ctx) => {
 
 ```typescript
 // Consume events as async stream
-for await (const event of kernel.events('user:*')) {
+for await (const event of qk.events('user:*')) {
   console.log(event.name, event.data);
 }
 ```
@@ -625,7 +625,7 @@ for await (const event of kernel.events('user:*')) {
 ### 4. Debug Mode
 
 ```typescript
-const kernel = createKernel({
+const qk = createKernel({
   debug: true,
   onError: (error, event) => {
     console.error(`Error in ${event.name}:`, error);
@@ -636,9 +636,9 @@ const kernel = createKernel({
 ### 5. Listener Introspection
 
 ```typescript
-kernel.listenerCount('event');  // Count for specific event
-kernel.listenerCount();         // Total count
-kernel.eventNames();            // All registered event names
+qk.listenerCount('event');  // Count for specific event
+qk.listenerCount();         // Total count
+qk.eventNames();            // All registered event names
 ```
 
 ### 6. Framework Adapters
@@ -650,7 +650,7 @@ v2 includes official adapters with auto-cleanup:
 import { useOn, useEventState } from '@quarkernel/vue';
 
 // React
-import { useOn, useEventState } from '@quarkernel/react';
+import { useOn, useEventState } from '@quazardous/quarkernel-react';
 
 // Svelte
 import { onEvent, eventStore } from '@quarkernel/svelte';
@@ -679,7 +679,7 @@ import { createWorkerBridge } from '@quarkernel/worker';
 qk.addEventListener('event', handler, 'target', 'dep');
 
 // v2
-kernel.on('event', handler, { id: 'target', after: 'dep' });
+qk.on('event', handler, { id: 'target', after: 'dep' });
 ```
 
 ---
@@ -688,13 +688,13 @@ kernel.on('event', handler, { id: 'target', after: 'dep' });
 
 **Error:** `TypeError: qk.dispatchEvent is not a function`
 
-**Solution:** Replace with `kernel.emit()`:
+**Solution:** Replace with `qk.emit()`:
 ```typescript
 // v1
 await qk.dispatchEvent(new QKE('event', data));
 
 // v2
-await kernel.emit('event', data);
+await qk.emit('event', data);
 ```
 
 ---
@@ -708,7 +708,7 @@ const event = new QKE('event', { x: 1 });
 await qk.dispatchEvent(event);
 
 // v2
-await kernel.emit('event', { x: 1 });
+await qk.emit('event', { x: 1 });
 ```
 
 ---
@@ -750,19 +750,19 @@ class V1Adapter {
   constructor(private kernel: Kernel) {}
 
   addEventListener(type: string, cb: Function, target?: string, deps?: string) {
-    return this.kernel.on(type, (e, ctx) => cb(e, target), {
+    return this.qk.on(type, (e, ctx) => cb(e, target), {
       id: target,
       after: deps
     });
   }
 
   dispatchEvent(event: { type: string; param: any }) {
-    return this.kernel.emit(event.type, event.param);
+    return this.qk.emit(event.type, event.param);
   }
 }
 
 // Use adapter
-const kernel = createKernel();
+const qk = createKernel();
 const legacy = new V1Adapter(kernel);
 legacy.addEventListener('event', handler);  // v1 API, v2 engine
 ```
