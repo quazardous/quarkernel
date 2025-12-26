@@ -1,6 +1,6 @@
 {
   "name": "@quazardous/quarkernel-react",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "type": "module",
   "description": "React bindings for QuarKernel - Context provider and hooks",
   "author": "quazardous <berliozdavid@gmail.com>",
