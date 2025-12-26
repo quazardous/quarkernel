@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuarKernel v2 Demos</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #e4e4e7;
+      padding: 2rem;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(90deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle { color: #a1a1aa; margin-bottom: 2rem; }
+    .demos { display: grid; gap: 1rem; }
+    .demo {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s;
+    }
+    .demo:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(96, 165, 250, 0.5);
+      transform: translateY(-2px);
+    }
+    .demo-info h2 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+    .demo-info p { color: #a1a1aa; font-size: 0.9rem; }
+    .demo-tags { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(96, 165, 250, 0.2);
+      color: #60a5fa;
+    }
+    .tag.vue { background: rgba(66, 184, 131, 0.2); color: #42b883; }
+    a.btn {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: opacity 0.2s;
+    }
+    a.btn:hover { opacity: 0.9; }
+    .footer {
+      margin-top: 3rem;
+      text-align: center;
+      color: #71717a;
+      font-size: 0.85rem;
+    }
+    .footer a { color: #60a5fa; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>QuarKernel v2</h1>
+    <p class="subtitle">Event orchestration with dependency ordering and shared context</p>
+
+    <div class="demos">
+      <div class="demo">
+        <div class="demo-info">
+          <h2>QK Studio</h2>
+          <p>Visual event composer with drag & drop - create, compose, and fire events using real QuarKernel Composition</p>
+          <div class="demo-tags">
+            <span class="tag">Interactive</span>
+            <span class="tag">Composition</span>
+            <span class="tag">vis.js</span>
+          </div>
+        </div>
+        <a href="./studio/" class="btn">Open</a>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>
+        <a href="https://github.com/quazardous/quarkernel">GitHub</a> ·
+        <a href="https://github.com/quazardous/quarkernel/blob/main/docs/getting-started.md">Docs</a> ·
+        <a href="https://github.com/quazardous/quarkernel/blob/main/docs/api-reference.md">API</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>

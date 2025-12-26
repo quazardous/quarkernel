@@ -1,0 +1,13 @@
+{
+  "name": "quarkernel-studio",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "vite --port 5174",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

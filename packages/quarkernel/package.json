@@ -1,0 +1,66 @@
+{
+  "name": "@quazardous/quarkernel",
+  "version": "2.0.0-alpha",
+  "type": "module",
+  "description": "Micro Custom Events Kernel with dependency ordering, shared context, and composite events",
+  "author": "quazardous <berliozdavid@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/quazardous/quarkernel.git",
+    "directory": "packages/quarkernel"
+  },
+  "bugs": {
+    "url": "https://github.com/quazardous/quarkernel/issues"
+  },
+  "homepage": "https://github.com/quazardous/quarkernel#readme",
+  "keywords": [
+    "event",
+    "events",
+    "kernel",
+    "promise",
+    "typescript",
+    "async",
+    "emitter",
+    "eventemitter",
+    "event-emitter",
+    "pubsub",
+    "publish-subscribe",
+    "dependency-ordering",
+    "shared-context",
+    "composite-events",
+    "wildcards",
+    "isomorphic"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  }
+}

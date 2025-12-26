@@ -1,0 +1,66 @@
+{
+  "name": "@quazardous/quarkernel-vue",
+  "version": "2.0.0-beta",
+  "type": "module",
+  "description": "Vue 3 adapter for QuarKernel - event kernel integration with Vue reactivity",
+  "author": "quazardous <berliozdavid@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/quazardous/quarkernel.git",
+    "directory": "packages/vue"
+  },
+  "bugs": {
+    "url": "https://github.com/quazardous/quarkernel/issues"
+  },
+  "homepage": "https://github.com/quazardous/quarkernel#readme",
+  "keywords": [
+    "quarkernel",
+    "vue",
+    "vue3",
+    "event",
+    "events",
+    "kernel",
+    "composable",
+    "plugin",
+    "reactivity"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@quazardous/quarkernel": "^2.0.0-alpha",
+    "vue": "^3.3.0"
+  },
+  "devDependencies": {
+    "@quazardous/quarkernel": "file:../quarkernel",
+    "jsdom": "^23.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0",
+    "vue": "^3.3.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "quarkernel-benchmarks",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Performance benchmarks comparing quarkernel to mitt and emittery",
+  "scripts": {
+    "bench": "node suite.js"
+  },
+  "dependencies": {
+    "@quazardous/quarkernel": "file:../packages/quarkernel",
+    "mitt": "^3.0.1",
+    "emittery": "^1.0.3",
+    "tinybench": "^2.9.0"
+  }
+}

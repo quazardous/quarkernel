@@ -1,0 +1,79 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build packages
+        run: npm run build
+
+      - name: Publish @quazardous/quarkernel
+        working-directory: ./packages/quarkernel
+        run: |
+          TAG=$(echo ${{ github.ref_name }} | grep -oP '(?<=-)[a-z]+(?=\.)' || echo "latest")
+          if [ "$TAG" = "latest" ]; then
+            npm publish --provenance
+          else
+            npm publish --tag $TAG --provenance
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @quazardous/quarkernel-vue
+        working-directory: ./packages/vue
+        run: |
+          TAG=$(echo ${{ github.ref_name }} | grep -oP '(?<=-)[a-z]+(?=\.)' || echo "latest")
+          if [ "$TAG" = "latest" ]; then
+            npm publish --provenance
+          else
+            npm publish --tag $TAG --provenance
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @quazardous/quarkernel-react
+        working-directory: ./packages/react
+        run: |
+          TAG=$(echo ${{ github.ref_name }} | grep -oP '(?<=-)[a-z]+(?=\.)' || echo "latest")
+          if [ "$TAG" = "latest" ]; then
+            npm publish --provenance
+          else
+            npm publish --tag $TAG --provenance
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @quazardous/quarkernel-svelte
+        working-directory: ./packages/svelte
+        run: |
+          TAG=$(echo ${{ github.ref_name }} | grep -oP '(?<=-)[a-z]+(?=\.)' || echo "latest")
+          if [ "$TAG" = "latest" ]; then
+            npm publish --provenance
+          else
+            npm publish --tag $TAG --provenance
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

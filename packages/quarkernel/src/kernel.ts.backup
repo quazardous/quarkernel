@@ -1,0 +1,412 @@
+/**
+ * QuarKernel Core Implementation
+ *
+ * A TypeScript event kernel with:
+ * - Priority-based listener ordering
+ * - Shared context between listeners
+ * - Async-first with Promise-based API
+ * - Arrow functions only (no `this` binding)
+ */
+
+import { KernelEvent } from './kernel-event.js';
+import { ListenerContext, type ListenerContextKernel } from './listener-context.js';
+import type {
+  EventMap,
+  ListenerFunction,
+  ListenerOptions,
+  ListenerEntry,
+  KernelOptions,
+} from './types.js';
+
+/**
+ * Core Kernel class
+ * Implements basic on(), off(), emit() with Map-based storage
+ */
+export class Kernel<Events extends EventMap = EventMap> implements ListenerContextKernel {
+  private listeners = new Map<string, ListenerEntry[]>();
+  private options: Required<KernelOptions>;
+  private listenerIdCounter = 0;
+
+  constructor(options: KernelOptions = {}) {
+    this.options = {
+      delimiter: options.delimiter ?? ':',
+      wildcard: options.wildcard ?? true,
+      maxListeners: options.maxListeners ?? Infinity,
+      debug: options.debug ?? false,
+      errorBoundary: options.errorBoundary ?? true,
+      onError: options.onError ?? ((error: Error) => {
+        console.error('Kernel error:', error);
+      }),
+      contextMerger: options.contextMerger ?? undefined,
+      onContextConflict: options.onContextConflict ?? undefined,
+    } as Required<KernelOptions>;
+  }
+
+  /**
+   * Register an event listener
+   * Returns an unbind function for cleanup
+   */
+  on<K extends keyof Events>(
+    eventName: K,
+    listener: ListenerFunction<Events[K]>,
+    options: ListenerOptions = {}
+  ): () => void {
+    const event = String(eventName);
+    const priority = options.priority ?? 0;
+    const id = options.id ?? `listener_${++this.listenerIdCounter}`;
+    const after = Array.isArray(options.after)
+      ? options.after
+      : options.after
+      ? [options.after]
+      : [];
+
+    // Create abort listener if signal provided
+    let abortListener: (() => void) | undefined;
+    if (options.signal) {
+      abortListener = () => this.off(event, listener);
+    }
+
+    const entry: ListenerEntry = {
+      id,
+      callback: listener as ListenerFunction,
+      after,
+      priority,
+      once: options.once ?? false,
+      original: listener as ListenerFunction,
+      signal: options.signal,
+      abortListener,
+    };
+
+    // Get or create listener array for this event
+    const entries = this.listeners.get(event) ?? [];
+    entries.push(entry);
+
+    // Sort by priority (descending: higher priority first)
+    // Note: Dependency ordering is handled in emit() by sortListenersByDependencies()
+    entries.sort((a, b) => b.priority - a.priority);
+
+    this.listeners.set(event, entries);
+
+    // Check maxListeners warning
+    if (this.options.maxListeners > 0 && entries.length > this.options.maxListeners) {
+      console.warn(
+        `MaxListenersExceeded: Event "${event}" has ${entries.length} listeners (limit: ${this.options.maxListeners})`
+      );
+    }
+
+    // Handle AbortSignal if provided
+    if (options.signal && abortListener) {
+      if (options.signal.aborted) {
+        // Already aborted, remove immediately
+        Promise.resolve().then(abortListener);
+      } else {
+        options.signal.addEventListener('abort', abortListener, { once: true });
+      }
+    }
+
+    // Return unbind function
+    return () => this.off(event, listener);
+  }
+
+  /**
+   * Remove an event listener
+   * If no listener provided, removes all listeners for the event
+   */
+  off(eventName: string, listener?: Function): void {
+    const entries = this.listeners.get(eventName);
+
+    if (!entries) {
+      return;
+    }
+
+    if (!listener) {
+      // Remove all listeners for this event and cleanup abort listeners
+      for (const entry of entries) {
+        if (entry.signal && entry.abortListener) {
+          entry.signal.removeEventListener('abort', entry.abortListener);
+        }
+      }
+      this.listeners.delete(eventName);
+      return;
+    }
+
+    // Find the entry to remove and cleanup its abort listener
+    const entryToRemove = entries.find((entry) => entry.original === listener);
+    if (entryToRemove?.signal && entryToRemove.abortListener) {
+      entryToRemove.signal.removeEventListener('abort', entryToRemove.abortListener);
+    }
+
+    // Remove specific listener by original function reference equality
+    const filtered = entries.filter((entry) => entry.original !== listener);
+
+    if (filtered.length === 0) {
+      this.listeners.delete(eventName);
+    } else {
+      this.listeners.set(eventName, filtered);
+    }
+  }
+
+  /**
+   * Emit an event
+   * Executes all registered listeners in parallel (by default)
+   * Returns a Promise that resolves when all listeners complete
+   * Throws AggregateError if any listeners failed
+   */
+  async emit<K extends keyof Events>(
+    eventName: K,
+    data?: Events[K]
+  ): Promise<void> {
+    const event = String(eventName);
+    const entries = this.listeners.get(event);
+
+    if (!entries || entries.length === 0) {
+      return;
+    }
+
+    // Create event object with properly typed data
+    const kernelEvent = new KernelEvent<Events[K]>(
+      event,
+      data as Events[K],
+      {}
+    );
+
+    // Sort listeners by dependencies and priority
+    // Note: Dependency ordering (toposort) will be handled in T118
+    // For now, entries are already sorted by priority in the on() method
+    const sortedEntries = entries;
+
+    // Execute all listeners in parallel using Promise.allSettled
+    // to ensure one failure doesn't block others
+    const promises = sortedEntries.map((entry) =>
+      this.executeListener(entry, kernelEvent, event)
+    );
+
+    const results = await Promise.allSettled(promises);
+
+    // Remove once listeners after execution
+    this.removeOnceListeners(event, entries, kernelEvent);
+
+    // Collect errors from rejected promises (only if errorBoundary is false)
+    if (!this.options.errorBoundary) {
+      const errors = results
+        .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+        .map((result) => result.reason);
+
+      if (errors.length > 0) {
+        throw new AggregateError(errors, `${errors.length} listener(s) failed for event "${event}"`);
+      }
+    }
+  }
+
+  /**
+  /**
+   * Sort listeners by dependencies using toposort, then by priority
+   * @throws MissingDependencyError if a dependency references a non-existent listener
+   * @throws CyclicDependencyError if circular dependencies are detected
+   */
+  private sortListenersByDependencies(entries: ListenerEntry[]): ListenerEntry[] {
+    // Check if any listeners have dependencies
+    const hasDependencies = entries.some(entry => entry.after.length > 0);
+
+    if (!hasDependencies) {
+      // No dependencies, already sorted by priority in on()
+      return entries;
+    }
+
+    // Validate that all dependencies exist
+    const listenerIds = new Set(entries.map(entry => entry.id));
+
+    for (const entry of entries) {
+      for (const dep of entry.after) {
+        if (!listenerIds.has(dep)) {
+          throw new MissingDependencyError(entry.id, dep);
+        }
+      }
+    }
+
+    // Convert entries to toposort nodes
+    const nodes = entries.map(entry => ({
+      id: entry.id,
+      after: entry.after,
+    }));
+
+    // Run toposort to get dependency order
+    const sortedIds = toposort(nodes);
+
+    // Group listeners by dependency level
+    // Listeners at the same level are sorted by priority
+    const levelMap = new Map<string, number>();
+    sortedIds.forEach((id, index) => {
+      levelMap.set(id, index);
+    });
+
+    // Create a sorted copy maintaining dependency order, then priority within levels
+    const sorted = [...entries].sort((a, b) => {
+      const levelA = levelMap.get(a.id) ?? 0;
+      const levelB = levelMap.get(b.id) ?? 0;
+
+      // First, sort by dependency level
+      if (levelA !== levelB) {
+        return levelA - levelB;
+      }
+
+      // Within same level, sort by priority (higher first)
+      return b.priority - a.priority;
+    });
+
+    return sorted;
+  }
+
+  /**
+   * Execute a single listener with error handling
+   */
+  private async executeListener(
+    entry: ListenerEntry,
+    event: KernelEvent<any>,
+    eventName: string
+  ): Promise<void> {
+    // Check if propagation was stopped
+    if (event.isPropagationStopped) {
+      return;
+    }
+
+    try {
+      // Create listener context
+      const ctx = new ListenerContext(
+        entry.id,
+        eventName,
+        entry.priority,
+        entry.after,
+        this,
+        entry.original,
+        entry.signal
+      );
+
+      // Set current event for context methods
+      ctx.setCurrentEvent(event);
+
+      try {
+        await entry.callback(event, ctx);
+      } finally {
+        // Clear current event after execution
+        ctx.clearCurrentEvent();
+      }
+    } catch (error) {
+      if (this.options.errorBoundary) {
+        // Call error handler but continue with other listeners
+        this.options.onError(error as Error, event);
+      } else {
+        // Re-throw if error boundary is disabled
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Remove listeners marked with once: true or whose predicate returns true after execution
+   */
+  private removeOnceListeners(eventName: string, entries: ListenerEntry[], event: KernelEvent<any>): void {
+    const listenersToRemove = entries.filter((entry) => {
+      if (!entry.once) {
+        return false;
+      }
+
+      // If once is true, always remove
+      if (entry.once === true) {
+        return true;
+      }
+
+      // If once is a predicate function, evaluate it
+      if (typeof entry.once === 'function') {
+        return entry.once(event);
+      }
+
+      return false;
+    });
+
+    if (listenersToRemove.length === 0) {
+      return;
+    }
+
+    // Remove each listener that should be removed
+    for (const entry of listenersToRemove) {
+      this.off(eventName, entry.original);
+    }
+  }
+
+  /**
+   * Get number of listeners for an event
+   */
+  listenerCount(eventName?: keyof Events): number {
+    if (!eventName) {
+      // Total count across all events
+      let total = 0;
+      for (const entries of this.listeners.values()) {
+        total += entries.length;
+      }
+      return total;
+    }
+
+    const event = String(eventName);
+    const entries = this.listeners.get(event);
+    return entries?.length ?? 0;
+  }
+
+  /**
+   * Get all event names with registered listeners
+   */
+  eventNames(): (keyof Events)[] {
+    return Array.from(this.listeners.keys()) as (keyof Events)[];
+  }
+
+  /**
+   * Remove all listeners for all events (or specific event)
+   */
+  offAll(eventName?: keyof Events): void {
+    if (!eventName) {
+      // Cleanup all abort listeners
+      for (const entries of this.listeners.values()) {
+        for (const entry of entries) {
+          if (entry.signal && entry.abortListener) {
+            entry.signal.removeEventListener('abort', entry.abortListener);
+          }
+        }
+      }
+      this.listeners.clear();
+      return;
+    }
+
+    // Cleanup abort listeners for specific event
+    const event = String(eventName);
+    const entries = this.listeners.get(event);
+    if (entries) {
+      for (const entry of entries) {
+        if (entry.signal && entry.abortListener) {
+          entry.signal.removeEventListener('abort', entry.abortListener);
+        }
+      }
+    }
+
+    this.listeners.delete(event);
+  }
+
+  /**
+   * Enable/disable debug mode
+   * In T115, this is a placeholder - full debug implementation in T129
+   */
+  debug(enabled: boolean): void {
+    this.options.debug = enabled;
+    if (enabled) {
+      console.log('[QuarKernel] Debug mode enabled');
+    }
+  }
+}
+
+/**
+ * Factory function to create a Kernel instance
+ */
+export const createKernel = <Events extends EventMap = EventMap>(
+  options?: KernelOptions
+): Kernel<Events> => {
+  return new Kernel<Events>(options);
+};
