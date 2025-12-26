@@ -1,6 +1,6 @@
 {
   "name": "@quazardous/quarkernel-svelte",
-  "version": "2.0.0-beta",
+  "version": "2.0.0",
   "type": "module",
   "description": "Svelte 5 adapter for QuarKernel - event kernel integration with Svelte context",
   "author": "quazardous <berliozdavid@gmail.com>",
