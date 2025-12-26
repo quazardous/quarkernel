@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { EventMap, ListenerOptions, KernelEvent } from '@quazardous/quarkernel';
+import type { EventMap, ListenerOptions, IKernelEvent } from '@quazardous/quarkernel';
 import { useKernel } from './useKernel.js';
 
 /**
@@ -82,7 +82,7 @@ export function useEventState<
     // Register listener that updates state
     const off = kernel.on(
       eventName,
-      (event: KernelEvent<Events[K]>) => {
+      (event: IKernelEvent<Events[K]>) => {
         setState(event.data);
       },
       options

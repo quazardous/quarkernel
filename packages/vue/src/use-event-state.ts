@@ -7,7 +7,7 @@
 
 import { ref, onUnmounted } from 'vue';
 import type { Ref } from 'vue';
-import type { ListenerOptions, KernelEvent } from '@quazardous/quarkernel';
+import type { ListenerOptions, IKernelEvent } from '@quazardous/quarkernel';
 import { useKernel } from './use-kernel.js';
 
 /**
@@ -18,7 +18,7 @@ export interface UseEventStateOptions extends Omit<ListenerOptions, 'once'> {
    * Transform function to extract value from event
    * Default: returns event.data
    */
-  transform?: (event: KernelEvent) => any;
+  transform?: (event: IKernelEvent) => any;
 }
 
 /**
@@ -75,12 +75,12 @@ export function useEventState<T = any, K extends string = string>(
 
   // Extract transform function from options
   const { transform, ...listenerOptions } = options || {};
-  const transformFn = transform || ((event: KernelEvent) => event.data);
+  const transformFn = transform || ((event: IKernelEvent) => event.data);
 
   // Register listener that updates state
   const unbind = kernel.on(
     eventName,
-    (event: KernelEvent) => {
+    (event: IKernelEvent) => {
       state.value = transformFn(event);
     },
     listenerOptions

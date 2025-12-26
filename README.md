@@ -167,7 +167,7 @@ npm install @quazardous/quarkernel @quazardous/quarkernel-svelte
 - [Core package](./packages/quarkernel/README.md) - Main QuarKernel library
 
 **Resources:**
-- [Benchmarks](./docs/benchmarks.md) - Performance comparisons
+- [Benchmarks](./benchmarks/README.md) - Performance comparisons
 - [Demos](./demos/README.md) - Live examples
 
 ---

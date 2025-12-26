@@ -1,0 +1,16 @@
+{
+  "date": "2025-12-26",
+  "node": "v22.20.0",
+  "commit": "pre-optimization (stable)",
+  "results": {
+    "simple-10": 157031,
+    "simple-1": 695783,
+    "wildcards-10": 157247,
+    "wildcards-pattern": 417949,
+    "deps-chain-3": 244273,
+    "deps-parallel-3": 235351,
+    "scale-10": 151624,
+    "scale-50": 34588,
+    "scale-100": 18564
+  }
+}
