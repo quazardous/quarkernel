@@ -1,6 +1,6 @@
 {
   "name": "@quazardous/quarkernel",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "type": "module",
   "description": "Micro Custom Events Kernel with dependency ordering, shared context, and composite events",
   "author": "quazardous <berliozdavid@gmail.com>",
