@@ -3,7 +3,7 @@ name: Deploy Demos to GitHub Pages
 on:
   push:
     branches:
-      - main
+      - v2
     paths:
       - 'demos/**'
       - 'packages/quarkernel/**'
