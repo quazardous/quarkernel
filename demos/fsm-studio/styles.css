@@ -193,6 +193,10 @@ body {
 .bottom-panel.hidden {
   height: 36px; /* Just the tabs bar */
 }
+.bottom-panel.hidden:not(.fullscreen) .ide-tab-actions[data-for],
+.bottom-panel.hidden:not(.fullscreen) .ide-tab-actions-edit {
+  display: none !important; /* Hide Add/Save/Cancel when collapsed (not fullscreen) */
+}
 .bottom-panel.fullscreen {
   top: 0;
   height: 100vh;
@@ -251,11 +255,16 @@ body {
 .ide-tab.disabled:hover {
   background: none;
 }
+.ide-tab-actions-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .ide-tab-actions-edit {
   display: flex;
   gap: 0.25rem;
   padding: 0.25rem;
-  margin-left: 0.5rem;
 }
 .ide-tab-actions {
   margin-left: auto;
@@ -267,7 +276,6 @@ body {
   display: flex;
   gap: 0.25rem;
   padding: 0.25rem;
-  margin-left: auto;
   border-left: 1px solid var(--border-color);
   padding-left: 0.75rem;
 }
@@ -573,6 +581,37 @@ body {
   max-height: 100px;
   overflow-y: auto;
   white-space: pre-wrap;
+}
+
+/* Selected State Details */
+.selected-state-display {
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid var(--yellow-400);
+  border-radius: 6px;
+  padding: 0.75rem;
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.3);
+}
+.selected-state-display .state-name {
+  font-weight: 600;
+  color: var(--yellow-400);
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+.selected-state-display .state-info {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+.selected-state-display .state-info strong {
+  color: var(--text-primary);
+}
+.selected-state-display .state-info-list {
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--text-muted);
+}
+.selected-state-display .state-info-list li {
+  margin-bottom: 0.15rem;
 }
 
 /* ===== Event Log ===== */

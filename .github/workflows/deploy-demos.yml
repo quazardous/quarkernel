@@ -34,14 +34,18 @@ jobs:
       - name: Build quarkernel package
         run: npm run build --workspace=packages/quarkernel
 
-      - name: Build studio demo
-        run: npm run build --workspace=demos/studio
+      - name: Build QK Studio demo
+        run: npm run build --workspace=demos/qk-studio
+
+      - name: Build FSM Studio demo
+        run: npm run build --workspace=demos/fsm-studio
 
       - name: Prepare deployment folder
         run: |
           mkdir -p deploy
           cp demos/index.html deploy/
-          cp -r demos/studio/dist deploy/studio
+          cp -r demos/qk-studio/dist deploy/qk-studio
+          cp -r demos/fsm-studio/dist deploy/fsm-studio
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

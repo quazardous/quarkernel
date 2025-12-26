@@ -311,8 +311,12 @@ function buildGraph(config, currentState) {
         shape: 'circle',
         size: 30,
         color: {
-          background: isCurrent ? 'var(--blue-500)' : 'transparent',
-          border: isCurrent ? 'var(--blue-400)' : '#71717a',
+          background: isCurrent ? '#3b82f6' : 'transparent',
+          border: isCurrent ? '#60a5fa' : '#71717a',
+          highlight: {
+            background: isCurrent ? '#3b82f6' : 'transparent',
+            border: '#facc15', // Yellow border when selected
+          },
         },
         borderWidth: 3,
         borderWidthSelected: 4,
@@ -320,6 +324,21 @@ function buildGraph(config, currentState) {
           color: '#e4e4e7',
           size: 12,
           face: 'system-ui, sans-serif',
+        },
+        shadow: {
+          enabled: false,
+          color: '#facc15',
+          size: 15,
+          x: 0,
+          y: 0,
+        },
+        chosen: {
+          node: (values) => {
+            values.shadow = true;
+            values.shadowColor = '#facc15';
+            values.shadowSize = 15;
+            values.borderColor = '#facc15';
+          },
         },
         shapeProperties: {
           borderDashes: false,
@@ -337,12 +356,27 @@ function buildGraph(config, currentState) {
           background: isCurrent ? '#3b82f6' : '#1e293b',
           border: isCurrent ? '#60a5fa' : '#475569',
           highlight: {
-            background: '#3b82f6',
-            border: '#60a5fa',
+            background: isCurrent ? '#3b82f6' : '#1e293b',
+            border: '#facc15', // Yellow border when selected
           },
           hover: {
             background: '#334155',
             border: '#64748b',
+          },
+        },
+        shadow: {
+          enabled: false,
+          color: '#facc15',
+          size: 15,
+          x: 0,
+          y: 0,
+        },
+        chosen: {
+          node: (values) => {
+            values.shadow = true;
+            values.shadowColor = '#facc15';
+            values.shadowSize = 15;
+            values.borderColor = '#facc15';
           },
         },
         borderWidth: 2,
@@ -485,24 +519,42 @@ function renderGraph() {
   const { nodes, edges } = buildGraph(config, currentMachine.getState());
   const positions = calculateInitialPositions(nodes, edges);
 
-  // Apply positions
-  nodes.forEach((node) => {
-    if (positions[node.id]) {
-      node.x = positions[node.id].x;
-      node.y = positions[node.id].y;
-    }
-  });
-
   const container = document.getElementById('graph');
 
   // Update or create DataSets
   if (nodesDataSet && edgesDataSet && network) {
-    // Update existing data
-    nodesDataSet.clear();
-    edgesDataSet.clear();
-    nodesDataSet.add(nodes);
-    edgesDataSet.add(edges);
+    // Preserve current node positions from the network
+    const currentPositions = network.getPositions();
+
+    // Apply preserved positions (or initial for new nodes)
+    nodes.forEach((node) => {
+      if (currentPositions[node.id]) {
+        node.x = currentPositions[node.id].x;
+        node.y = currentPositions[node.id].y;
+      } else if (positions[node.id]) {
+        node.x = positions[node.id].x;
+        node.y = positions[node.id].y;
+      }
+    });
+
+    // Update nodes in place (preserves view)
+    nodesDataSet.update(nodes);
+
+    // Only update edges if they changed
+    const currentEdgeIds = edgesDataSet.getIds();
+    const newEdgeIds = edges.map(e => e.id);
+    if (JSON.stringify(currentEdgeIds.sort()) !== JSON.stringify(newEdgeIds.sort())) {
+      edgesDataSet.clear();
+      edgesDataSet.add(edges);
+    }
   } else {
+    // Apply initial positions for new network
+    nodes.forEach((node) => {
+      if (positions[node.id]) {
+        node.x = positions[node.id].x;
+        node.y = positions[node.id].y;
+      }
+    });
     // Create new network
     nodesDataSet = new vis.DataSet(nodes);
     edgesDataSet = new vis.DataSet(edges);
@@ -559,7 +611,80 @@ function renderGraph() {
         }
       }
     });
+
+    // Select node to show state details in left panel
+    network.on('selectNode', (params) => {
+      if (params.nodes.length === 1 && params.nodes[0] !== '__initial__') {
+        showSelectedStateDetails(params.nodes[0]);
+      }
+    });
+
+    // Deselect to hide state details
+    network.on('deselectNode', () => {
+      hideSelectedStateDetails();
+    });
   }
+}
+
+// ===== Show/Hide Selected State Details =====
+function showSelectedStateDetails(stateName) {
+  const section = document.getElementById('selected-state-section');
+  const details = document.getElementById('selected-state-details');
+
+  if (!currentMachineName || !machineConfigs[currentMachineName]) return;
+
+  const config = machineConfigs[currentMachineName];
+  const stateConfig = config.states[stateName];
+  const behavior = machineBehaviors[currentMachineName];
+
+  if (!stateConfig) return;
+
+  let html = `<div class="state-name">${stateName}</div>`;
+
+  // Transitions
+  if (stateConfig.on && Object.keys(stateConfig.on).length > 0) {
+    html += `<div class="state-info"><strong>Transitions:</strong></div>`;
+    html += `<ul class="state-info-list">`;
+    for (const [event, target] of Object.entries(stateConfig.on)) {
+      const targetState = typeof target === 'string' ? target : target.target;
+      html += `<li>${event} → ${targetState}</li>`;
+    }
+    html += `</ul>`;
+  }
+
+  // Behaviors from machineBehaviors
+  if (behavior) {
+    // onEnter
+    if (behavior.onEnter && behavior.onEnter[stateName]) {
+      html += `<div class="state-info"><strong>onEnter:</strong> ✓</div>`;
+    }
+    // onExit
+    if (behavior.onExit && behavior.onExit[stateName]) {
+      html += `<div class="state-info"><strong>onExit:</strong> ✓</div>`;
+    }
+    // Timer
+    if (behavior.timers && behavior.timers[stateName]) {
+      const timer = behavior.timers[stateName];
+      html += `<div class="state-info"><strong>Timer:</strong> ${timer.send} after ${timer.delay}ms</div>`;
+    }
+  }
+
+  // Is initial?
+  if (config.initial === stateName) {
+    html += `<div class="state-info"><strong>Initial state</strong></div>`;
+  }
+
+  // Is final?
+  if (!stateConfig.on || Object.keys(stateConfig.on).length === 0) {
+    html += `<div class="state-info"><strong>Final state</strong></div>`;
+  }
+
+  details.innerHTML = html;
+  section.style.display = '';
+}
+
+function hideSelectedStateDetails() {
+  document.getElementById('selected-state-section').style.display = 'none';
 }
 
 // ===== Helper: setValue only if changed, preserve scroll =====
@@ -947,6 +1072,9 @@ window.loadExample = async (name) => {
     clearMasterTab();
   }
 
+  // Hide selected state details
+  hideSelectedStateDetails();
+
   try {
     const response = await fetch(filePath);
     const example = await response.json();
@@ -1076,6 +1204,7 @@ window.toggleFullscreen = () => {
 
   // Collapse/expand side panels (keep header visible)
   if (isFullscreen) {
+    bottomPanel.classList.remove('hidden'); // Ensure content is visible
     leftPanel.classList.add('collapsed');
     rightPanel.classList.add('collapsed');
     iconExpand.style.display = 'none';
@@ -1301,4 +1430,4 @@ window.cancelChanges = () => {
 // ===== Initialize =====
 log('FSM Studio initialized', 'system');
 // Load default example
-loadExample('order');
+loadExample('trafficLight');

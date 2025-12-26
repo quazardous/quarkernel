@@ -57,6 +57,12 @@
             <div class="context-display" id="context">{ }</div>
           </div>
 
+          <!-- Selected State Details -->
+          <div class="section" id="selected-state-section" style="display:none">
+            <span class="section-title">Selected State</span>
+            <div class="selected-state-display" id="selected-state-details"></div>
+          </div>
+
           <!-- Legend -->
           <div class="section">
             <span class="section-title">Legend</span>
@@ -103,7 +109,7 @@
     </div>
 
     <!-- Bottom Panel: Tabbed IDE-style -->
-    <div class="overlay-panel bottom-panel" id="bottom-panel">
+    <div class="overlay-panel bottom-panel hidden" id="bottom-panel">
       <div class="panel-handle bottom-handle" onclick="togglePanel('bottom')">▼</div>
       <div class="panel-inner">
         <!-- IDE Tabs -->
@@ -119,41 +125,41 @@
           <div class="ide-tab-actions" data-for="xstate" style="display:none">
             <button class="btn btn-sm btn-secondary" onclick="copyCurrentTab()">Copy</button>
           </div>
-          <div class="ide-tab-actions" data-for="fsm">
-            <select id="add-callback-type" class="callback-type-select" onchange="addCallbackTemplate(this.value); this.selectedIndex=0;">
-              <option value="" disabled selected>+ Add</option>
-              <option value="enter">onEnter</option>
-              <option value="exit">onExit</option>
-              <option value="transition">on (event)</option>
-              <option value="timer">timer</option>
-            </select>
-          </div>
-          <!-- Save/Cancel buttons (disabled when not editing) -->
-          <div class="ide-tab-actions-edit">
-            <button id="save-btn" class="btn btn-sm btn-primary" onclick="saveChanges()" disabled>Save</button>
-            <button id="cancel-btn" class="btn btn-sm btn-danger" onclick="cancelChanges()" disabled>Cancel</button>
-          </div>
-          <!-- Examples dropdown -->
-          <div class="ide-tab-actions-global">
-            <select id="examples-select" onchange="loadExample(this.value); this.selectedIndex=0;">
-              <option value="" disabled selected>Examples</option>
-              <optgroup label="Built-in">
+          <!-- Right-side buttons (grouped) -->
+          <div class="ide-tab-actions-right">
+            <!-- Add callback (FSM tab only, hidden when collapsed) -->
+            <div class="ide-tab-actions" data-for="fsm">
+              <select id="add-callback-type" class="callback-type-select" onchange="addCallbackTemplate(this.value); this.selectedIndex=0;">
+                <option value="" disabled selected>+ Add</option>
+                <option value="enter">onEnter</option>
+                <option value="exit">onExit</option>
+                <option value="transition">on (event)</option>
+                <option value="timer">timer</option>
+              </select>
+            </div>
+            <!-- Save/Cancel buttons (disabled when not editing) -->
+            <div class="ide-tab-actions-edit">
+              <button id="save-btn" class="btn btn-sm btn-primary" onclick="saveChanges()" disabled>Save</button>
+              <button id="cancel-btn" class="btn btn-sm btn-danger" onclick="cancelChanges()" disabled>Cancel</button>
+            </div>
+            <!-- Examples dropdown -->
+            <div class="ide-tab-actions-global">
+              <select id="examples-select" onchange="loadExample(this.value); this.selectedIndex=0;">
+                <option value="" disabled selected>Examples</option>
+                <option value="trafficLight">Traffic Light</option>
+                <option value="coffee">Coffee Machine</option>
+                <option value="player">Media Player</option>
                 <option value="order">Order</option>
                 <option value="payment">Payment</option>
-              </optgroup>
-              <optgroup label="XState">
-                <option value="coffee">Coffee Machine</option>
-                <option value="trafficLight">Traffic Light</option>
-                <option value="player">Media Player</option>
-              </optgroup>
-            </select>
-          </div>
-          <!-- Fullscreen toggle -->
-          <div class="ide-tab-actions-fullscreen">
-            <button id="fullscreen-btn" class="btn btn-sm btn-secondary" onclick="toggleFullscreen()" title="Fullscreen">
-              <span class="icon-expand">↗</span>
-              <span class="icon-collapse" style="display:none">↙</span>
-            </button>
+              </select>
+            </div>
+            <!-- Fullscreen toggle -->
+            <div class="ide-tab-actions-fullscreen">
+              <button id="fullscreen-btn" class="btn btn-sm btn-secondary" onclick="toggleFullscreen()" title="Fullscreen">
+                <span class="icon-expand">↗</span>
+                <span class="icon-collapse" style="display:none">↙</span>
+              </button>
+            </div>
           </div>
         </div>
 

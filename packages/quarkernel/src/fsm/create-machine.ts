@@ -8,7 +8,7 @@
 import { Kernel } from '../kernel.js';
 import { useMachine } from './machine.js';
 import { toXStateFormat } from './xstate-import.js';
-import type { Machine, MachineConfig, MachineSnapshot } from './types.js';
+import type { Machine, MachineConfig } from './types.js';
 
 /**
  * Behavior helpers passed to callbacks
