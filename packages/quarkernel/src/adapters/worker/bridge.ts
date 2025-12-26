@@ -236,48 +236,57 @@ export function createWorkerBridge<Events extends EventMap = EventMap>(
     ): () => void {
       const eventName = String(Array.isArray(event) ? event[0] : event);
 
+      // Wrap listener if once option is set
+      const wrappedListener: ListenerFunction<Events[K]> = options?.once
+        ? (evt, ctx) => {
+            unbind();
+            return listener(evt, ctx);
+          }
+        : listener;
+
       if (!listeners.has(eventName)) {
         listeners.set(eventName, new Set());
       }
-      listeners.get(eventName)!.add(listener as ListenerFunction);
+      listeners.get(eventName)!.add(wrappedListener as ListenerFunction);
 
       if (debug) {
         console.debug('[WorkerBridge] Listener registered for event:', eventName);
       }
 
       // Return unbind function
-      return () => {
+      const unbind = () => {
         const eventListeners = listeners.get(eventName);
         if (eventListeners) {
-          eventListeners.delete(listener as ListenerFunction);
+          eventListeners.delete(wrappedListener as ListenerFunction);
           if (eventListeners.size === 0) {
             listeners.delete(eventName);
           }
         }
       };
+
+      return unbind;
     },
 
     once<K extends keyof Events>(
       event: K,
-      listener?: any,
-      options?: any
-    ): any {
-      // Handle promise-based once
-      if (listener === undefined) {
-        return new Promise((resolve) => {
-          const unbind = this.on(event, (evt) => {
-            unbind();
-            resolve(evt);
-          });
-        });
-      }
+      options?: { timeout?: number }
+    ): Promise<IKernelEvent<Events[K]>> {
+      return new Promise((resolve, reject) => {
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-      // Handle listener-based once
-      const unbind = this.on(event, async (evt, ctx) => {
-        unbind();
-        await listener(evt, ctx);
-      }, options);
-      return unbind;
+        const unbind = this.on(event, (evt) => {
+          if (timeoutId) clearTimeout(timeoutId);
+          unbind();
+          resolve(evt);
+        });
+
+        if (options?.timeout) {
+          timeoutId = setTimeout(() => {
+            unbind();
+            reject(new Error(`once('${String(event)}') timed out after ${options.timeout}ms`));
+          }, options.timeout);
+        }
+      });
     },
 
     off<K extends keyof Events>(event: K, listener?: ListenerFunction<Events[K]>): void {

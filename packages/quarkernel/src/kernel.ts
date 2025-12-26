@@ -151,6 +151,49 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
   }
 
   /**
+   * Wait for an event once (Promise-based)
+   *
+   * For callback style, use: `qk.on(event, listener, { once: true })`
+   *
+   * @param eventName - Event to wait for
+   * @param options - Optional timeout in ms
+   * @returns Promise resolving with the event
+   *
+   * @example
+   * ```typescript
+   * // .then() receives: IKernelEvent { name, data, context, timestamp }
+   * const event = await qk.once('user:loaded');
+   * console.log(event.data);    // event payload
+   * console.log(event.context); // shared context
+   *
+   * // With timeout (rejects if event doesn't fire)
+   * const event = await qk.once('user:loaded', { timeout: 5000 });
+   * ```
+   */
+  once<K extends keyof Events>(
+    eventName: K,
+    options?: { timeout?: number }
+  ): Promise<KernelEvent<Events[K]>> {
+    return new Promise<KernelEvent<Events[K]>>((resolve, reject) => {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+      const listener: ListenerFunction<Events[K]> = (event) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        resolve(event as KernelEvent<Events[K]>);
+      };
+
+      const unbind = this.on(eventName, listener, { once: true });
+
+      if (options?.timeout) {
+        timeoutId = setTimeout(() => {
+          unbind();
+          reject(new Error(`once('${String(eventName)}') timed out after ${options.timeout}ms`));
+        }, options.timeout);
+      }
+    });
+  }
+
+  /**
    * Remove an event listener
    * If no listener provided, removes all listeners for the event
    */

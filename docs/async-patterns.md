@@ -8,11 +8,20 @@ FSM      →  Track state
 
 ---
 
-## Promise Behavior
+## Promise API Reference
 
-### `emit()` → `Promise<void>`
+### QK: `emit()` → `Promise<void>`
 
 Resolves when **all listeners complete** (parallel by default).
+
+```typescript
+await qk.emit('event', data);
+
+// .then() receives: void (nothing)
+qk.emit('event', data).then(() => console.log('all listeners done'));
+```
+
+**Error handling:**
 
 ```typescript
 // errorBoundary: true (default) - never throws
@@ -24,23 +33,69 @@ try { await qk.emit('event'); }
 catch (e) { console.log(e.errors); }
 ```
 
-### `emitSerial()` → `Promise<void>`
+### QK: `emitSerial()` → `Promise<void>`
 
-Same as `emit()`, but sequential execution.
+Same as `emit()`, sequential execution.
 
-### FSM `send()` → `Promise<boolean>`
+### QK: `once()` → `Promise<IKernelEvent>`
 
 ```typescript
-const ok = await machine.send('SUBMIT'); // true if transitioned
+// .then() receives: IKernelEvent { name, data, context, timestamp }
+const event = await qk.once('user:loaded');
+console.log(event.data);    // event payload
+console.log(event.context); // shared context
+
+// With timeout (rejects on timeout)
+const event = await qk.once('user:loaded', { timeout: 5000 });
+
+// For callback style, use on() with once option:
+const unbind = qk.on('user:loaded', (e) => console.log(e.data), { once: true });
 ```
 
-Errors in entry/exit are caught silently. Handle them yourself:
+### Composition: `once()` → `Promise<IKernelEvent>`
 
 ```typescript
-entry: async (ctx, { send }) => {
-  try { await op(); send('OK'); }
-  catch { send('ERROR'); }
+const composition = new Composition([
+  [qk, 'user:ready'],
+  [qk, 'config:ready'],
+]);
+
+// .then() receives: IKernelEvent with data: { sources, contexts, merged }
+const event = await composition.once();
+console.log(event.data.merged);  // merged context
+console.log(event.data.sources); // ['user:ready', 'config:ready']
+
+// With timeout
+const event = await composition.once({ timeout: 5000 });
+```
+
+### FSM: `send()` → `Promise<boolean>`
+
+```typescript
+// .then() receives: boolean (true if transitioned)
+const transitioned = await machine.send('SUBMIT');
+
+if (transitioned) {
+  console.log(machine.getState());   // new state
+  console.log(machine.getContext()); // current context
 }
+```
+
+### FSM: `waitFor()` → `Promise<{ state, from?, event?, context }>`
+
+```typescript
+// .then() receives: { state, from?, event?, context }
+const result = await machine.waitFor('completed');
+console.log(result.state);   // 'completed'
+console.log(result.from);    // previous state
+console.log(result.event);   // transition event
+console.log(result.context); // machine context
+
+// With timeout (rejects on timeout)
+await machine.waitFor('completed', { timeout: 5000 });
+
+// Already in state? Resolves immediately
+await machine.waitFor(machine.getState());
 ```
 
 ---
@@ -70,7 +125,29 @@ qk.on('init', async (e) => {
 await qk.emit('init', { id: '123' });
 ```
 
-### 2. FSM Async State
+### 2. Wait for Event
+
+```typescript
+// Start async operation
+qk.emit('user:fetch', { id: '123' });
+
+// Wait for result
+const event = await qk.once('user:loaded');
+console.log(event.data.user);
+```
+
+### 3. Race Between Events
+
+```typescript
+const result = await Promise.race([
+  qk.once('success'),
+  qk.once('error'),
+]);
+
+if (result.name === 'success') { ... }
+```
+
+### 4. FSM Async State
 
 ```typescript
 const loader = createMachine({
@@ -97,7 +174,18 @@ const loader = createMachine({
 });
 ```
 
-### 3. QK + FSM
+### 5. Wait for FSM State
+
+```typescript
+// Start transition
+machine.send('SUBMIT');
+
+// Wait for final state
+const result = await machine.waitFor('completed');
+console.log(result.context);
+```
+
+### 6. QK + FSM
 
 ```typescript
 const order = useMachine(qk, {
@@ -115,9 +203,12 @@ qk.on('order:enter:pending', async () => {
   try { await chargeCard(); order.send('PAY'); }
   catch { order.send('CANCEL'); }
 });
+
+await order.send('SUBMIT');
+await order.waitFor('paid');
 ```
 
-### 4. Composition
+### 7. Composition
 
 ```typescript
 const appReady = new Composition([
@@ -125,10 +216,15 @@ const appReady = new Composition([
   [qk, 'config:ready'],
 ]);
 
+// Callback style
 appReady.onComposed((e) => initApp(e.data.merged));
+
+// Promise style
+const { data } = await appReady.once();
+initApp(data.merged);
 ```
 
-### 5. Error Collection (like `Promise.allSettled`)
+### 8. Error Collection
 
 ```typescript
 qk.on('batch', async () => { await mayFail1(); });
@@ -138,24 +234,20 @@ await qk.emit('batch'); // all run, never throws
 qk.getExecutionErrors().forEach(e => console.log(e.error));
 ```
 
-### 6. FSM Timeout
-
-```typescript
-loading: {
-  entry: async (ctx, { send }) => {
-    send('DONE', { data: await fetchData() });
-  },
-  after: { delay: 5000, send: 'TIMEOUT' },
-  on: { DONE: 'success', TIMEOUT: 'timedOut' },
-}
-```
-
 ---
 
 ## Summary
 
+| Method | `.then()` receives |
+|--------|-------------------|
+| `qk.emit()` | `void` |
+| `qk.once()` | `IKernelEvent { name, data, context }` |
+| `qk.on(..., { once: true })` | N/A (returns unbind) |
+| `composition.once()` | `IKernelEvent { data: { sources, merged } }` |
+| `machine.send()` | `boolean` |
+| `machine.waitFor()` | `{ state, from?, event?, context }` |
+
 | Layer | Error Handling |
 |-------|----------------|
-| **Promise** | try/catch |
 | **QK** | `errorBoundary` + `getExecutionErrors()` |
 | **FSM** | try/catch in actions → transition to error state |

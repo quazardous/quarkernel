@@ -515,9 +515,9 @@ describe('WorkerBridge', () => {
       await bridge.readyPromise;
     });
 
-    it('removes listener after first execution', async () => {
+    it('on() with once:true removes listener after first execution', async () => {
       const listener = vi.fn();
-      bridge.kernel.once('test:event', listener);
+      bridge.kernel.on('test:event', listener, { once: true });
 
       await mockWorker.simulateMessage({
         type: 'event',
@@ -538,7 +538,7 @@ describe('WorkerBridge', () => {
       expect(listener).toHaveBeenCalledTimes(1);
     });
 
-    it('returns promise that resolves with event when called without listener', async () => {
+    it('once() returns promise that resolves with event', async () => {
       const promise = bridge.kernel.once('test:event');
 
       await mockWorker.simulateMessage({

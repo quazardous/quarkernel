@@ -319,6 +319,47 @@ export class Composition<Events extends EventMap = EventMap> {
   }
 
   /**
+   * Wait for the next composition completion as a Promise
+   *
+   * @param options - Optional timeout configuration
+   * @returns Promise resolving with composed event data
+   *
+   * @example
+   * ```typescript
+   * // .then() receives: { sources, contexts, merged }
+   * const result = await composition.once();
+   * console.log(result.data.merged); // merged context from all sources
+   * console.log(result.data.sources); // ['event1', 'event2']
+   *
+   * // With timeout
+   * const result = await composition.once({ timeout: 5000 });
+   * ```
+   */
+  once(options?: { timeout?: number }): Promise<IKernelEvent<{
+    sources: EventName[];
+    contexts: Record<EventName, Record<string, any>>;
+    merged: Record<string, any>;
+  }>> {
+    return new Promise((resolve, reject) => {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+      const listener: ListenerFunction<any> = (event) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        resolve(event);
+      };
+
+      const unbind = this.kernel.on(COMPOSED_EVENT as keyof Events, listener, { once: true });
+
+      if (options?.timeout) {
+        timeoutId = setTimeout(() => {
+          unbind();
+          reject(new Error(`composition.once() timed out after ${options.timeout}ms`));
+        }, options.timeout);
+      }
+    });
+  }
+
+  /**
    * Remove a listener for composed events
    */
   offComposed(listener?: Function): void {

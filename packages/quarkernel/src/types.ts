@@ -299,21 +299,20 @@ export interface IKernel<Events extends EventMap = EventMap> {
     options?: ListenerOptions
   ): () => void;
 
+  /**
+   * Wait for an event once (Promise-based)
+   *
+   * For callback style, use: `on(event, listener, { once: true })`
+   *
+   * @example
+   * ```typescript
+   * const event = await qk.once('user:loaded');
+   * const event = await qk.once('user:loaded', { timeout: 5000 });
+   * ```
+   */
   once<K extends keyof Events>(
     event: K,
-    listener: ListenerFunction<Events[K]>,
-    options?: Omit<ListenerOptions, 'once'>
-  ): () => void;
-
-  once<K extends keyof Events>(
-    event: K,
-    predicate: PredicateFunction<Events[K]>,
-    listener: ListenerFunction<Events[K]>,
-    options?: Omit<ListenerOptions, 'once'>
-  ): () => void;
-
-  once<K extends keyof Events>(
-    event: K
+    options?: { timeout?: number }
   ): Promise<IKernelEvent<Events[K]>>;
 
   // Unsubscribe methods

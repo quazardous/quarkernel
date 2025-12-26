@@ -302,6 +302,53 @@ export function useMachine<TContext = Record<string, any>>(
       }
     },
 
+    waitFor(
+      targetState: StateName,
+      options?: { timeout?: number }
+    ): Promise<{
+      state: StateName;
+      from?: StateName;
+      event?: TransitionEvent;
+      context: TContext;
+    }> {
+      // Already in target state
+      if (currentState === targetState) {
+        return Promise.resolve({
+          state: currentState,
+          context: structuredClone(context),
+        });
+      }
+
+      return new Promise((resolve, reject) => {
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+        // Listen for enter event on target state
+        const unbind = kernel.on(
+          `${prefix}:enter:${targetState}` as any,
+          (event: any) => {
+            if (timeoutId) clearTimeout(timeoutId);
+            unbind();
+            resolve({
+              state: targetState,
+              from: event.data?.from,
+              event: event.data?.event,
+              context: structuredClone(context),
+            });
+          }
+        );
+
+        // Track cleanup
+        cleanupFns.push(unbind);
+
+        if (options?.timeout) {
+          timeoutId = setTimeout(() => {
+            unbind();
+            reject(new Error(`waitFor('${targetState}') timed out after ${options.timeout}ms`));
+          }, options.timeout);
+        }
+      });
+    },
+
     destroy(): void {
       for (const cleanup of cleanupFns) {
         cleanup();

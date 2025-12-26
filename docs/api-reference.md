@@ -130,62 +130,43 @@ qk.on('**', handler);         // Matches all events
 
 ##### once()
 
-Listen for an event only once, then auto-remove.
+Wait for an event (Promise-based).
 
-**Signature (auto-remove):**
+**Signature:**
 ```typescript
 once<K extends keyof Events>(
   event: K,
-  listener: ListenerFunction<Events[K]>,
-  options?: Omit<ListenerOptions, 'once'>
-): UnbindFunction
-```
-
-**Signature (predicate-based removal):**
-```typescript
-once<K extends keyof Events>(
-  event: K,
-  predicate: PredicateFunction<Events[K]>,
-  listener: ListenerFunction<Events[K]>,
-  options?: Omit<ListenerOptions, 'once'>
-): UnbindFunction
-```
-
-**Signature (promise-based):**
-```typescript
-once<K extends keyof Events>(
-  event: K
-): Promise<KernelEvent<Events[K]>>
+  options?: { timeout?: number }
+): Promise<IKernelEvent<Events[K]>>
 ```
 
 **Parameters:**
-- `event`: Event name to listen for
-- `listener`: Callback function
-- `predicate` (optional): Function `(event) => boolean` evaluated AFTER listener execution. If returns `true`, listener is removed.
-- `options` (optional): Listener configuration (excluding `once` option)
+- `event`: Event name to wait for
+- `options` (optional): `{ timeout?: number }` - timeout in ms (rejects on timeout)
 
-**Returns:** Unbind function or Promise (depending on signature used).
-
-**Important:** When using a predicate, it is evaluated AFTER the listener executes, not before. The listener always runs at least once per event.
+**Returns:** `Promise<IKernelEvent>` resolving with `{ name, data, context, timestamp }`.
 
 **Example:**
 ```typescript
-// Auto-remove after first call
-qk.once('app:ready', async (event, ctx) => {
-  console.log('App is ready!');
-});
+// Wait for an event
+const event = await qk.once('user:login');
+console.log(event.data);    // event payload
+console.log(event.context); // shared context
 
-// Conditional removal (remove after count reaches 3)
-qk.on('user:login', async (event, ctx) => {
+// With timeout
+const event = await qk.once('app:ready', { timeout: 5000 });
+
+// For callback style, use on() with once option:
+qk.on('app:ready', (event) => {
+  console.log('App is ready!');
+}, { once: true });
+
+// Conditional removal (predicate evaluated after execution)
+qk.on('user:login', (event) => {
   event.context.count = (event.context.count || 0) + 1;
-  console.log('Login count:', event.context.count);
 }, {
   once: (event) => event.context.count >= 3
 });
-
-// Promise-based (await first event)
-const event = await qk.once('user:login');
-console.log('First user login:', event.data);
 ```
 
 ##### off()

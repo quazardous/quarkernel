@@ -152,8 +152,39 @@ export interface Machine<TContext = any> {
   /** Update context */
   setContext(updater: Partial<TContext> | ((ctx: TContext) => TContext)): void;
 
-  /** Send transition event */
+  /**
+   * Send transition event
+   *
+   * @returns Promise<boolean> - true if transition occurred, false otherwise
+   *
+   * @example
+   * ```typescript
+   * const transitioned = await machine.send('SUBMIT');
+   * // After await, check machine.getState() for current state
+   * ```
+   */
   send(event: TransitionEvent, payload?: any, options?: SendOptions<TContext>): Promise<boolean>;
+
+  /**
+   * Wait until machine reaches a specific state
+   *
+   * @param state - Target state to wait for
+   * @param options - Optional timeout
+   * @returns Promise resolving when state is reached
+   *
+   * @example
+   * ```typescript
+   * // .then() receives: { state, from?, event?, context }
+   * await machine.waitFor('completed');
+   * await machine.waitFor('completed', { timeout: 5000 });
+   * ```
+   */
+  waitFor(state: StateName, options?: { timeout?: number }): Promise<{
+    state: StateName;
+    from?: StateName;
+    event?: TransitionEvent;
+    context: TContext;
+  }>;
 
   /** Check if transition is valid from current state */
   can(event: TransitionEvent): boolean;

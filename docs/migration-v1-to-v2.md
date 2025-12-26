@@ -601,16 +601,24 @@ await qk.emit('event', data);
 await qk.emitSerial('event', data);
 ```
 
-### 2. Once with Predicate
+### 2. Once (Promise-based)
 
 ```typescript
-// Wait for event with condition
-await qk.once('user:update', (event) => event.data.role === 'admin');
+// Wait for event (returns Promise)
+const event = await qk.once('user:update');
 
-// Or as listener
-qk.once('event', (event) => event.data.ready, (event, ctx) => {
+// With timeout
+const event = await qk.once('user:update', { timeout: 5000 });
+
+// Callback style uses on() with once option
+qk.on('event', (event, ctx) => {
+  console.log('Fired once!');
+}, { once: true });
+
+// Conditional removal with predicate
+qk.on('event', (event, ctx) => {
   console.log('Ready!');
-});
+}, { once: (event) => event.data.ready });
 ```
 
 ### 3. Async Iteration

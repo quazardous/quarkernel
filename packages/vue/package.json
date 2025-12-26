@@ -1,6 +1,6 @@
 {
   "name": "@quazardous/quarkernel-vue",
-  "version": "2.1.3",
+  "version": "2.2.0",
   "type": "module",
   "description": "Vue 3 adapter for QuarKernel - event kernel integration with Vue reactivity",
   "author": "quazardous <berliozdavid@gmail.com>",
