@@ -3,18 +3,32 @@
 ## Quick publish
 
 ```bash
-# 1. Bump version (patch/minor/major)
-npm version patch --workspace=packages/quarkernel --no-git-tag-version
-npm version patch --workspace=packages/react --no-git-tag-version
-npm version patch --workspace=packages/vue --no-git-tag-version
+# 1. Bump version (patch/minor/major) - all packages manually
+npm version patch --workspace=packages/quarkernel --no-git-tag-version && \
+npm version patch --workspace=packages/react --no-git-tag-version && \
+npm version patch --workspace=packages/vue --no-git-tag-version && \
 npm version patch --workspace=packages/svelte --no-git-tag-version
 
 # 2. Commit
-git add -A && git commit -m "Bump to vX.X.X"
+git add -A && git commit -m "vX.X.X - Description"
 
 # 3. Tag and push (triggers GitHub Actions publish)
-git tag vX.X.X
-git push && git push --tags
+git tag vX.X.X && git push && git push --tags
+```
+
+## Build outputs
+
+- `dist/index.js` - ESM
+- `dist/index.cjs` - CommonJS
+- `dist/index.umd.js` - IIFE for CDN (unpkg, jsdelivr)
+- `dist/fsm.js` / `dist/xstate.js` - Sub-modules
+
+CDN usage:
+```html
+<script src="https://unpkg.com/@quazardous/quarkernel@2/dist/index.umd.js"></script>
+<script>
+  const qk = QuarKernel.createKernel();
+</script>
 ```
 
 ## Verify
