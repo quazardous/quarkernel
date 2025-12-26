@@ -30,7 +30,7 @@ jobs:
         run: npm run build
 
       - name: Run tests
-        run: npm test
+        run: npm test --workspace=packages/quarkernel --workspace=packages/react --workspace=packages/vue --workspace=packages/svelte
 
       # Determine npm tag based on version number
       # v1.x.x → tag "v1" (maintenance)
