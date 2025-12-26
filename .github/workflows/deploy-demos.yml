@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - v2
-    paths:
-      - 'demos/**'
-      - 'packages/quarkernel/**'
-      - '.github/workflows/deploy-demos.yml'
   workflow_dispatch:
 
 permissions:
@@ -46,6 +42,9 @@ jobs:
           mkdir -p deploy
           cp demos/index.html deploy/
           cp -r demos/studio/dist deploy/studio
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
