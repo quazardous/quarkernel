@@ -11,69 +11,65 @@ jobs:
     permissions:
       contents: read
       id-token: write
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Build all packages
+        run: npm run build
+
       - name: Run tests
         run: npm test
 
-      - name: Build packages
-        run: npm run build
+      # Determine npm tag based on version number
+      # v1.x.x → tag "v1" (maintenance)
+      # v2.x.x → tag "latest" (current)
+      - name: Determine npm tag
+        id: npm-tag
+        run: |
+          VERSION=$(node -p "require('./packages/quarkernel/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          if [[ "$VERSION" == 1.* ]]; then
+            echo "tag=v1" >> $GITHUB_OUTPUT
+            echo "📦 v1.x detected → publishing with tag 'v1'"
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "📦 v2.x detected → publishing with tag 'latest'"
+          fi
 
       - name: Publish @quazardous/quarkernel
-        working-directory: ./packages/quarkernel
         run: |
-          TAG=$(echo ${{ github.ref_name }} | grep -oP '(?<=-)[a-z]+(?=\.)' || echo "latest")
-          if [ "$TAG" = "latest" ]; then
-            npm publish --provenance
-          else
-            npm publish --tag $TAG --provenance
-          fi
+          echo "Publishing @quazardous/quarkernel@${{ steps.npm-tag.outputs.version }} with tag '${{ steps.npm-tag.outputs.tag }}'"
+          npm publish --workspace=packages/quarkernel --tag ${{ steps.npm-tag.outputs.tag }} --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @quazardous/quarkernel-vue
-        working-directory: ./packages/vue
-        run: |
-          TAG=$(echo ${{ github.ref_name }} | grep -oP '(?<=-)[a-z]+(?=\.)' || echo "latest")
-          if [ "$TAG" = "latest" ]; then
-            npm publish --provenance
-          else
-            npm publish --tag $TAG --provenance
-          fi
+        run: npm publish --workspace=packages/vue --tag ${{ steps.npm-tag.outputs.tag }} --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
 
-      - name: Publish @quazardous/quarkernel-react
-        working-directory: ./packages/react
-        run: |
-          TAG=$(echo ${{ github.ref_name }} | grep -oP '(?<=-)[a-z]+(?=\.)' || echo "latest")
-          if [ "$TAG" = "latest" ]; then
-            npm publish --provenance
-          else
-            npm publish --tag $TAG --provenance
-          fi
+      - name: Publish @quarkernel/react
+        run: npm publish --workspace=packages/react --tag ${{ steps.npm-tag.outputs.tag }} --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
 
       - name: Publish @quazardous/quarkernel-svelte
-        working-directory: ./packages/svelte
-        run: |
-          TAG=$(echo ${{ github.ref_name }} | grep -oP '(?<=-)[a-z]+(?=\.)' || echo "latest")
-          if [ "$TAG" = "latest" ]; then
-            npm publish --provenance
-          else
-            npm publish --tag $TAG --provenance
-          fi
+        run: npm publish --workspace=packages/svelte --tag ${{ steps.npm-tag.outputs.tag }} --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
