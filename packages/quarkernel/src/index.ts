@@ -10,7 +10,7 @@
  * - Zero runtime dependencies
  */
 
-export const VERSION = '2.0.0-alpha';
+export const VERSION = '2.1.0';
 
 // Core exports
 export { KernelEvent } from './kernel-event.js';
@@ -63,3 +63,21 @@ export {
 
 // Internal utilities
 export { toposort, CyclicDependencyError, type TopoNode } from './toposort.js';
+
+// FSM - State Machine Layer
+export { useMachine, defineMachine, fromXState, toXStateFormat } from './fsm/index.js';
+export type {
+  MachineConfig,
+  Machine,
+  MachineSnapshot,
+  StateNode,
+  TransitionDef,
+  SendOptions,
+  FSMEventData,
+  StateName,
+  TransitionEvent,
+  GuardFunction,
+  ActionFunction,
+  XStateMachineConfig,
+  ImportOptions,
+} from './fsm/index.js';

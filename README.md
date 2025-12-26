@@ -4,11 +4,12 @@
 [![bundle size](https://img.shields.io/bundlephobia/minzip/@quazardous/quarkernel?style=flat-square)](https://bundlephobia.com/package/@quazardous/quarkernel)
 [![license](https://img.shields.io/npm/l/@quazardous/quarkernel.svg?style=flat-square)](https://github.com/quazardous/quarkernel/blob/main/LICENSE)
 
-**Event orchestration with dependency ordering and shared context.**
+**Event orchestration with dependency ordering, shared context, and state machines.**
 
 TypeScript-first. Zero dependencies. < 2KB gzipped.
 
 [![Try QK Studio](https://img.shields.io/badge/Try_it_live-QK_Studio-blue?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlnb24gcG9pbnRzPSI1IDMgMTkgMTIgNSAyMSA1IDMiPjwvcG9seWdvbj48L3N2Zz4=)](https://quazardous.github.io/quarkernel/studio/)
+[![Try FSM Studio](https://img.shields.io/badge/Try_it_live-FSM_Studio-purple?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiPjxjaXJjbGUgY3g9IjYiIGN5PSIxMiIgcj0iMyIvPjxjaXJjbGUgY3g9IjE4IiBjeT0iMTIiIHI9IjMiLz48bGluZSB4MT0iOSIgeTE9IjEyIiB4Mj0iMTUiIHkyPSIxMiIvPjwvc3ZnPg==)](https://quazardous.github.io/quarkernel/fsm-studio/)
 
 ---
 
@@ -93,6 +94,43 @@ kernel.on('user:*', (e) => console.log('User action:', e.name));
 
 ---
 
+## State Machines (FSM)
+
+Built-in finite state machine support with XState-compatible format:
+
+```typescript
+import { createMachine } from '@quazardous/quarkernel/fsm';
+
+const order = createMachine({
+  id: 'order',
+  initial: 'draft',
+  context: { items: 0 },
+  states: {
+    draft: { on: { SUBMIT: 'pending' } },
+    pending: { on: { APPROVE: 'confirmed', REJECT: 'draft' } },
+    confirmed: { on: { SHIP: 'shipped' } },
+    shipped: {}
+  },
+  onEnter: {
+    confirmed: (ctx, { log }) => log('Order confirmed!')
+  },
+  on: {
+    SUBMIT: (ctx, { set }) => set({ submittedAt: Date.now() })
+  }
+});
+
+order.send('SUBMIT');
+console.log(order.state); // 'pending'
+```
+
+**Features:**
+- XState import/export (`fromXState`, `toXState`)
+- Behavior helpers: `set()`, `send()`, `log()`
+- Auto-timers for delayed transitions
+- Visual debugging with [FSM Studio](https://quazardous.github.io/quarkernel/fsm-studio/)
+
+---
+
 ## Framework Adapters
 
 Official bindings with auto-cleanup on unmount:
@@ -140,9 +178,13 @@ npm install @quazardous/quarkernel @quazardous/quarkernel-svelte
 
 **Form wizards** - Step dependencies with shared validation context
 
+**Order workflows** - State machines for order lifecycle (draft → pending → confirmed → shipped)
+
 **Analytics** - Wildcard listeners for all `track:*` events
 
 **Microservices** - Event choreography with dependency graphs
+
+**UI flows** - FSM-driven modals, wizards, and multi-step forms
 
 ---
 

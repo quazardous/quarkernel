@@ -1,0 +1,10 @@
+{
+  "id": "player",
+  "initial": "stopped",
+  "context": { "position": 0 },
+  "states": {
+    "stopped": { "on": { "PLAY": "playing" } },
+    "playing": { "on": { "PAUSE": "paused", "STOP": "stopped" } },
+    "paused": { "on": { "PLAY": "playing", "STOP": "stopped" } }
+  }
+}

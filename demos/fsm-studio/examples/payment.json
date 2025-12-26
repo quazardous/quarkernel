@@ -1,0 +1,13 @@
+{
+  "id": "payment",
+  "initial": "pending",
+  "context": { "amount": 0, "method": null },
+  "states": {
+    "pending": { "on": { "PROCESS": "processing" } },
+    "processing": { "on": { "SUCCESS": "paid", "FAIL": "failed", "TIMEOUT": "pending" } },
+    "paid": { "on": { "REFUND": "refunding" } },
+    "failed": { "on": { "RETRY": "processing" } },
+    "refunding": { "on": { "REFUND_SUCCESS": "refunded", "REFUND_FAIL": "paid" } },
+    "refunded": {}
+  }
+}

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FSM Studio - QuarKernel</title>
+  <link href="https://unpkg.com/vis-network@9.1.9/dist/dist/vis-network.min.css" rel="stylesheet" />
+  <!-- CodeMirror -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css" />
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Main Container with Grid Background -->
+  <div class="main-container">
+    <!-- Watermark -->
+    <div class="watermark">
+      <h1>FSM Studio</h1>
+      <p>Drag states • Click transitions to fire</p>
+    </div>
+
+    <!-- Graph Container (full screen) -->
+    <div id="graph"></div>
+
+    <!-- Left Panel: Control -->
+    <div class="overlay-panel left-panel" id="left-panel">
+      <div class="panel-handle left-handle" onclick="togglePanel('left')">◀</div>
+      <div class="panel-inner">
+        <div class="panel-header">
+          <h2>FSM Studio</h2>
+          <a href="../" class="btn btn-sm btn-secondary">← Demos</a>
+        </div>
+
+
+        <div class="panel-content">
+          <!-- Current State -->
+          <div class="section">
+            <span class="section-title">Current State</span>
+            <div class="state-display" id="current-state">-</div>
+          </div>
+
+          <!-- Transitions -->
+          <div class="section">
+            <span class="section-title">Available Transitions</span>
+            <div class="transitions" id="transitions"></div>
+            <div class="actions">
+              <button class="btn btn-sm btn-danger" onclick="forceReset()">Reset</button>
+              <select id="force-to-select" class="force-select" onchange="forceToStateSelect(this.value); this.selectedIndex=0;">
+                <option value="" disabled selected>Force to</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Context -->
+          <div class="section">
+            <span class="section-title">Context</span>
+            <div class="context-display" id="context">{ }</div>
+          </div>
+
+          <!-- Legend -->
+          <div class="section">
+            <span class="section-title">Legend</span>
+            <div class="legend">
+              <div class="legend-item">
+                <span class="legend-icon initial"></span>
+                <span>Initial</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-icon state"></span>
+                <span>State</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-icon active"></span>
+                <span>Current</span>
+              </div>
+              <div class="legend-item">
+                <span class="legend-icon final"></span>
+                <span>Final</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel: Event Log -->
+    <div class="overlay-panel right-panel" id="right-panel">
+      <div class="resize-handle-left" id="right-resize-handle"></div>
+      <div class="panel-handle right-handle" onclick="togglePanel('right')">▶</div>
+      <div class="panel-inner">
+        <div class="panel-header">
+          <h2>Event Log</h2>
+          <label class="checkbox-label">
+            <input type="checkbox" id="show-kernel-events" onchange="toggleKernelEvents(this.checked)">
+            <span>Kernel</span>
+          </label>
+          <button class="btn btn-sm btn-secondary" onclick="clearLog()">Clear</button>
+        </div>
+        <div class="panel-content">
+          <div class="event-log" id="event-log"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Panel: Tabbed IDE-style -->
+    <div class="overlay-panel bottom-panel" id="bottom-panel">
+      <div class="panel-handle bottom-handle" onclick="togglePanel('bottom')">▼</div>
+      <div class="panel-inner">
+        <!-- IDE Tabs -->
+        <div class="ide-tabs">
+          <div class="ide-tab" data-tab="json-state">JSON State</div>
+          <div class="ide-tab" data-tab="xstate">XState</div>
+          <div class="ide-tab active" data-tab="fsm">FSM</div>
+          <!-- Dynamic actions per tab -->
+          <div class="ide-tab-actions" data-for="json-state" style="display:none">
+            <button class="btn btn-sm btn-secondary" onclick="copyCurrentTab()">Copy</button>
+            <button class="btn btn-sm btn-secondary" onclick="pasteCurrentTab()">Paste</button>
+          </div>
+          <div class="ide-tab-actions" data-for="xstate" style="display:none">
+            <button class="btn btn-sm btn-secondary" onclick="copyCurrentTab()">Copy</button>
+          </div>
+          <div class="ide-tab-actions" data-for="fsm">
+            <select id="add-callback-type" class="callback-type-select" onchange="addCallbackTemplate(this.value); this.selectedIndex=0;">
+              <option value="" disabled selected>+ Add</option>
+              <option value="enter">onEnter</option>
+              <option value="exit">onExit</option>
+              <option value="transition">on (event)</option>
+              <option value="timer">timer</option>
+            </select>
+          </div>
+          <!-- Save/Cancel buttons (disabled when not editing) -->
+          <div class="ide-tab-actions-edit">
+            <button id="save-btn" class="btn btn-sm btn-primary" onclick="saveChanges()" disabled>Save</button>
+            <button id="cancel-btn" class="btn btn-sm btn-danger" onclick="cancelChanges()" disabled>Cancel</button>
+          </div>
+          <!-- Examples dropdown -->
+          <div class="ide-tab-actions-global">
+            <select id="examples-select" onchange="loadExample(this.value); this.selectedIndex=0;">
+              <option value="" disabled selected>Examples</option>
+              <optgroup label="Built-in">
+                <option value="order">Order</option>
+                <option value="payment">Payment</option>
+              </optgroup>
+              <optgroup label="XState">
+                <option value="coffee">Coffee Machine</option>
+                <option value="trafficLight">Traffic Light</option>
+                <option value="player">Media Player</option>
+              </optgroup>
+            </select>
+          </div>
+          <!-- Fullscreen toggle -->
+          <div class="ide-tab-actions-fullscreen">
+            <button id="fullscreen-btn" class="btn btn-sm btn-secondary" onclick="toggleFullscreen()" title="Fullscreen">
+              <span class="icon-expand">↗</span>
+              <span class="icon-collapse" style="display:none">↙</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab Contents -->
+        <div class="ide-tab-content" id="tab-json-state">
+          <textarea id="snapshot" placeholder="JSON state will appear here..."></textarea>
+        </div>
+
+        <div class="ide-tab-content" id="tab-xstate">
+          <textarea id="xstate-input" placeholder='{"id": "example", "initial": "idle", "states": {...}}'></textarea>
+        </div>
+
+        <div class="ide-tab-content active" id="tab-fsm">
+          <textarea id="fsm-editor" placeholder="// Loading FSM behaviors..."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/vis-network@9.1.9/dist/vis-network.min.js"></script>
+  <!-- CodeMirror -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
