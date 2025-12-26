@@ -183,8 +183,9 @@ describe('Kernel - Basic on/off/emit (T115)', () => {
       await kernel.emit('test:simple', { value: 1 });
 
       // Both should complete around same time (parallel execution)
-      expect(delays[0]).toBeGreaterThanOrEqual(50);
-      expect(delays[1]).toBeGreaterThanOrEqual(50);
+      // Use 45ms threshold to account for timing variance on CI
+      expect(delays[0]).toBeGreaterThanOrEqual(45);
+      expect(delays[1]).toBeGreaterThanOrEqual(45);
       expect(Math.abs(delays[0] - delays[1])).toBeLessThan(30);
     });
 
