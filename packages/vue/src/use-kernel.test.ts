@@ -42,11 +42,27 @@ describe('useKernel', () => {
     const kernel = createKernel();
     const originalWindow = global.window;
 
-    delete (global as any).window;
+    // We need to test SSR detection without breaking Vue's mount
+    // Since isSSR() checks `typeof window === 'undefined'`, we test by:
+    // 1. Creating the component and app
+    // 2. Temporarily making window undefined during setup execution
+
+    let setupCalled = false;
 
     const TestComponent = defineComponent({
       setup() {
-        useKernel();
+        // Temporarily remove window during useKernel call
+        const win = (global as any).window;
+        delete (global as any).window;
+
+        try {
+          setupCalled = true;
+          useKernel();
+        } finally {
+          // Restore immediately for Vue internals
+          (global as any).window = win;
+        }
+
         return () => h('div', 'test');
       },
     });
@@ -55,15 +71,13 @@ describe('useKernel', () => {
     app.use(QuarKernelPlugin, { kernel });
 
     const container = document.createElement('div');
-    (global as any).window = originalWindow;
     app.mount(container);
-    delete (global as any).window;
+
+    expect(setupCalled).toBe(true);
 
     const warnings = consoleWarnSpy.mock.calls.filter((call: any[]) =>
       call[0]?.includes('server-side rendering')
     );
-
-    (global as any).window = originalWindow;
 
     expect(warnings.length).toBeGreaterThan(0);
   });

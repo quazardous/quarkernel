@@ -5,9 +5,25 @@
  * Automatically cleans up the listener when the component unmounts.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { EventMap, ListenerOptions, IKernelEvent } from '@quazardous/quarkernel';
 import { useKernel } from './useKernel.js';
+
+/**
+ * Selector function to extract value from event
+ */
+export type EventStateSelector<T = any> = (event: IKernelEvent) => T;
+
+/**
+ * Options for useEventState hook
+ */
+export interface UseEventStateOptions<T = any> extends ListenerOptions {
+  /**
+   * Selector function to extract value from event
+   * Default: (event) => event.data
+   */
+  selector?: EventStateSelector<T>;
+}
 
 /**
  * Hook to maintain state that updates on events
@@ -17,7 +33,7 @@ import { useKernel } from './useKernel.js';
  *
  * @param eventName - Event name to listen to
  * @param initialValue - Initial state value
- * @param options - Optional listener options (priority, after, signal, etc.)
+ * @param selectorOrOptions - Optional selector function or options object
  * @returns Current state value
  *
  * @example
@@ -32,19 +48,24 @@ import { useKernel } from './useKernel.js';
  * }
  * ```
  *
- * @example With transformer
+ * @example With selector function
  * ```tsx
- * function NotificationCount() {
- *   const [count, setCount] = useState(0);
+ * function Counter() {
+ *   const count = useEventState('counter:updated', 0, (event) => event.data.value);
  *
- *   useEventState('notification:new', 0);
+ *   return <div>Count: {count}</div>;
+ * }
+ * ```
  *
- *   // Or manually control the state update
- *   useOn('notification:new', (event) => {
- *     setCount(prev => prev + 1);
+ * @example With options object
+ * ```tsx
+ * function UserName() {
+ *   const name = useEventState('user:login', 'Guest', {
+ *     selector: (event) => event.data.name,
+ *     priority: 10
  *   });
  *
- *   return <div>Notifications: {count}</div>;
+ *   return <div>Hello, {name}</div>;
  * }
  * ```
  *
@@ -69,21 +90,37 @@ import { useKernel } from './useKernel.js';
  */
 export function useEventState<
   Events extends EventMap = EventMap,
-  K extends keyof Events = keyof Events
+  K extends keyof Events = keyof Events,
+  T = Events[K]
 >(
   eventName: K,
-  initialValue: Events[K],
-  options?: ListenerOptions
-): Events[K] {
+  initialValue: T,
+  selectorOrOptions?: EventStateSelector<T> | UseEventStateOptions<T>
+): T {
   const kernel = useKernel<Events>();
-  const [state, setState] = useState<Events[K]>(initialValue);
+  const [state, setState] = useState<T>(initialValue);
+
+  // Normalize options: function becomes selector, object used as-is
+  const { selector, options } = useMemo(() => {
+    if (typeof selectorOrOptions === 'function') {
+      return { selector: selectorOrOptions, options: undefined };
+    }
+    if (selectorOrOptions) {
+      const { selector: sel, ...opts } = selectorOrOptions;
+      return { selector: sel, options: Object.keys(opts).length > 0 ? opts : undefined };
+    }
+    return { selector: undefined, options: undefined };
+  }, [selectorOrOptions]);
+
+  // Default selector returns event.data
+  const selectorFn = selector || ((event: IKernelEvent) => event.data as T);
 
   useEffect(() => {
     // Register listener that updates state
     const off = kernel.on(
       eventName,
       (event: IKernelEvent<Events[K]>) => {
-        setState(event.data);
+        setState(selectorFn(event));
       },
       options
     );
@@ -107,7 +144,7 @@ export function useEventState<
 
     // Return cleanup function
     return off;
-  }, [kernel, eventName, options]);
+  }, [kernel, eventName, selector, options]);
 
   return state;
 }

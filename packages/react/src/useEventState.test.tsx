@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, act } from '@testing-library/react';
 import { createKernel } from '@quazardous/quarkernel';
 import { KernelProvider } from './KernelProvider.js';
 import { useEventState } from './useEventState.js';
@@ -44,7 +44,9 @@ describe('useEventState', () => {
 
     expect(stateValue).toBe('initial');
 
-    await kernel.emit('test:event', 'updated');
+    await act(async () => {
+      await kernel.emit('test:event', 'updated');
+    });
 
     await waitFor(() => {
       expect(stateValue).toBe('updated');
@@ -68,13 +70,19 @@ describe('useEventState', () => {
 
     expect(stateValue).toBe(0);
 
-    await kernel.emit('test:event', 1);
+    await act(async () => {
+      await kernel.emit('test:event', 1);
+    });
     await waitFor(() => expect(stateValue).toBe(1));
 
-    await kernel.emit('test:event', 2);
+    await act(async () => {
+      await kernel.emit('test:event', 2);
+    });
     await waitFor(() => expect(stateValue).toBe(2));
 
-    await kernel.emit('test:event', 3);
+    await act(async () => {
+      await kernel.emit('test:event', 3);
+    });
     await waitFor(() => expect(stateValue).toBe(3));
   });
 
@@ -93,7 +101,9 @@ describe('useEventState', () => {
       </KernelProvider>
     );
 
-    await kernel.emit('test:event', 'updated');
+    await act(async () => {
+      await kernel.emit('test:event', 'updated');
+    });
 
     await waitFor(() => {
       expect(stateValue).toBe('updated');
@@ -132,9 +142,11 @@ describe('useEventState', () => {
 
     expect(userData).toBe(null);
 
-    await kernel.emit('user:login', {
-      userId: '123',
-      username: 'testuser'
+    await act(async () => {
+      await kernel.emit('user:login', {
+        userId: '123',
+        username: 'testuser'
+      });
     });
 
     await waitFor(() => {
@@ -163,7 +175,9 @@ describe('useEventState', () => {
       </KernelProvider>
     );
 
-    await kernel.emit('test:event', 'first-update');
+    await act(async () => {
+      await kernel.emit('test:event', 'first-update');
+    });
 
     await waitFor(() => {
       expect(stateValue).toBe('first-update');
@@ -256,7 +270,9 @@ describe('useEventState', () => {
       </KernelProvider>
     );
 
-    await kernel.emit('test:event', 42);
+    await act(async () => {
+      await kernel.emit('test:event', 42);
+    });
 
     await waitFor(() => {
       expect(stateValue).toBe(42);
@@ -281,7 +297,9 @@ describe('useEventState', () => {
     expect(stateValue).toEqual({ count: 0, items: [] });
 
     const newData = { count: 5, items: ['a', 'b', 'c'] };
-    await kernel.emit('test:event', newData);
+    await act(async () => {
+      await kernel.emit('test:event', newData);
+    });
 
     await waitFor(() => {
       expect(stateValue).toEqual(newData);
@@ -303,13 +321,17 @@ describe('useEventState', () => {
       </KernelProvider>
     );
 
-    await kernel.emit('test:event', null);
+    await act(async () => {
+      await kernel.emit('test:event', null);
+    });
 
     await waitFor(() => {
       expect(stateValue).toBe(null);
     });
 
-    await kernel.emit('test:event', undefined);
+    await act(async () => {
+      await kernel.emit('test:event', undefined);
+    });
 
     await waitFor(() => {
       expect(stateValue).toBe(undefined);
@@ -335,14 +357,18 @@ describe('useEventState', () => {
     // Initial render
     expect(renderSpy).toHaveBeenCalledTimes(1);
 
-    await kernel.emit('test:event', 'updated');
+    await act(async () => {
+      await kernel.emit('test:event', 'updated');
+    });
 
     await waitFor(() => {
       expect(renderSpy).toHaveBeenCalledTimes(2);
     });
 
     // Emit same value again - React should not re-render due to setState optimization
-    await kernel.emit('test:event', 'updated');
+    await act(async () => {
+      await kernel.emit('test:event', 'updated');
+    });
 
     // Note: React's setState may or may not trigger a re-render depending on
     // Object.is comparison, so we just verify the state is still correct

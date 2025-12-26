@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, act } from '@testing-library/react';
 import { StrictMode, useEffect, useState } from 'react';
 import { createKernel, type Kernel } from '@quazardous/quarkernel';
 import { KernelProvider, useOn, useKernel, useEventState } from '../src/index.js';
@@ -36,9 +36,11 @@ describe('React adapter lifecycle integration', () => {
       );
 
       // Verify listeners are registered
-      await kernel.emit('event:a', {});
-      await kernel.emit('event:b', {});
-      await kernel.emit('event:c', {});
+      await act(async () => {
+        await kernel.emit('event:a', {});
+        await kernel.emit('event:b', {});
+        await kernel.emit('event:c', {});
+      });
 
       await waitFor(() => {
         expect(handler1).toHaveBeenCalledTimes(1);
@@ -86,7 +88,9 @@ describe('React adapter lifecycle integration', () => {
       );
 
       // Both should receive events
-      await kernel.emit('test:event', {});
+      await act(async () => {
+        await kernel.emit('test:event', {});
+      });
 
       await waitFor(() => {
         expect(handlerA).toHaveBeenCalledTimes(1);
@@ -97,7 +101,9 @@ describe('React adapter lifecycle integration', () => {
       unmountA();
 
       // Only B should receive events
-      await kernel.emit('test:event', {});
+      await act(async () => {
+        await kernel.emit('test:event', {});
+      });
 
       await waitFor(() => {
         expect(handlerA).toHaveBeenCalledTimes(1);
@@ -137,7 +143,9 @@ describe('React adapter lifecycle integration', () => {
         </KernelProvider>
       );
 
-      await kernel.emit('test:event', {});
+      await act(async () => {
+        await kernel.emit('test:event', {});
+      });
 
       await waitFor(() => {
         expect(handlerParent).toHaveBeenCalledTimes(1);
@@ -176,14 +184,18 @@ describe('React adapter lifecycle integration', () => {
         </KernelProvider>
       );
 
-      await kernel.emit('test:event', {});
+      await act(async () => {
+        await kernel.emit('test:event', {});
+      });
 
       await waitFor(() => {
         expect(handler).toHaveBeenCalledTimes(1);
       });
 
       // Hide component by triggering state change
-      getByText('Hide').click();
+      await act(async () => {
+        getByText('Hide').click();
+      });
       rerender(
         <KernelProvider kernel={kernel}>
           <ParentComponent />
@@ -222,7 +234,9 @@ describe('React adapter lifecycle integration', () => {
 
       // In StrictMode, effects run twice in development
       // But listeners should still be correctly registered
-      await kernel.emit('test:event', {});
+      await act(async () => {
+        await kernel.emit('test:event', {});
+      });
 
       await waitFor(() => {
         expect(handler).toHaveBeenCalled();
@@ -255,7 +269,9 @@ describe('React adapter lifecycle integration', () => {
         </KernelProvider>
       );
 
-      await kernel.emit('test:event', {});
+      await act(async () => {
+        await kernel.emit('test:event', {});
+      });
 
       await waitFor(() => {
         expect(handler).toHaveBeenCalledTimes(1);
@@ -284,7 +300,9 @@ describe('React adapter lifecycle integration', () => {
         </KernelProvider>
       );
 
-      await kernel.emit('test:event', {});
+      await act(async () => {
+        await kernel.emit('test:event', {});
+      });
 
       await waitFor(() => {
         expect(handler).toHaveBeenCalledTimes(1);
@@ -318,8 +336,10 @@ describe('React adapter lifecycle integration', () => {
         </KernelProvider>
       );
 
-      await kernel.emit('event:a', {});
-      await kernel.emit('event:b', {});
+      await act(async () => {
+        await kernel.emit('event:a', {});
+        await kernel.emit('event:b', {});
+      });
 
       await waitFor(() => {
         expect(handler1).toHaveBeenCalledTimes(1);
@@ -329,8 +349,10 @@ describe('React adapter lifecycle integration', () => {
       // Abort only first signal
       controller1.abort();
 
-      await kernel.emit('event:a', {});
-      await kernel.emit('event:b', {});
+      await act(async () => {
+        await kernel.emit('event:a', {});
+        await kernel.emit('event:b', {});
+      });
 
       await waitFor(() => {
         expect(handler1).toHaveBeenCalledTimes(1);
@@ -399,7 +421,7 @@ describe('React adapter lifecycle integration', () => {
 
     it('should cleanup useEventState subscriptions on unmount', async () => {
       function TestComponent() {
-        const state = useEventState('test:event', 0, (prev) => prev + 1);
+        const state = useEventState('test:event', 0);
         return <div>count: {state}</div>;
       }
 
@@ -409,14 +431,16 @@ describe('React adapter lifecycle integration', () => {
         </KernelProvider>
       );
 
-      await kernel.emit('test:event', {});
-      await kernel.emit('test:event', {});
+      await act(async () => {
+        await kernel.emit('test:event', 1);
+        await kernel.emit('test:event', 2);
+      });
 
       unmount();
 
       // Emit more events - should not cause errors or memory leaks
-      await kernel.emit('test:event', {});
-      await kernel.emit('test:event', {});
+      await kernel.emit('test:event', 3);
+      await kernel.emit('test:event', 4);
     });
 
     it('should handle rapid mount/unmount without listener buildup', async () => {
@@ -475,7 +499,9 @@ describe('React adapter lifecycle integration', () => {
           </KernelProvider>
         );
 
-        await kernel.emit('test:event', {});
+        await act(async () => {
+          await kernel.emit('test:event', {});
+        });
 
         await waitFor(() => {
           expect(handler).toHaveBeenCalledTimes(1);
@@ -529,7 +555,9 @@ describe('React adapter lifecycle integration', () => {
       );
 
       // Both should receive event
-      await kernel.emit('shared:event', {});
+      await act(async () => {
+        await kernel.emit('shared:event', {});
+      });
 
       await waitFor(() => {
         expect(handler1).toHaveBeenCalledTimes(1);
@@ -561,7 +589,9 @@ describe('React adapter lifecycle integration', () => {
         </KernelProvider>
       );
 
-      await kernel.emit('test:event', {});
+      await act(async () => {
+        await kernel.emit('test:event', {});
+      });
 
       await waitFor(() => {
         expect(executionOrder).toEqual(['A', 'B']);
@@ -582,7 +612,9 @@ describe('React adapter lifecycle integration', () => {
         </KernelProvider>
       );
 
-      await kernel.emit('test:event', {});
+      await act(async () => {
+        await kernel.emit('test:event', {});
+      });
 
       await waitFor(() => {
         expect(handler).toHaveBeenCalledTimes(1);
@@ -598,7 +630,9 @@ describe('React adapter lifecycle integration', () => {
       );
 
       // Should register listener again
-      await kernel.emit('test:event', {});
+      await act(async () => {
+        await kernel.emit('test:event', {});
+      });
 
       await waitFor(() => {
         expect(handler).toHaveBeenCalledTimes(2);

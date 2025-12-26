@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, act } from '@testing-library/react';
 import { createKernel } from '@quazardous/quarkernel';
 import { KernelProvider } from './KernelProvider.js';
 import { useOn } from './useOn.js';
@@ -24,7 +24,9 @@ describe('useOn', () => {
       </KernelProvider>
     );
 
-    await kernel.emit('test:event', { value: 42 });
+    await act(async () => {
+      await kernel.emit('test:event', { value: 42 });
+    });
 
     await waitFor(() => {
       expect(handler).toHaveBeenCalledTimes(1);
@@ -48,7 +50,9 @@ describe('useOn', () => {
       </KernelProvider>
     );
 
-    await kernel.emit('test:event', { value: 1 });
+    await act(async () => {
+      await kernel.emit('test:event', { value: 1 });
+    });
 
     await waitFor(() => {
       expect(handler).toHaveBeenCalledTimes(1);
@@ -79,7 +83,9 @@ describe('useOn', () => {
       </KernelProvider>
     );
 
-    await kernel.emit('test:event', {});
+    await act(async () => {
+      await kernel.emit('test:event', {});
+    });
 
     await waitFor(() => {
       expect(handler1).toHaveBeenCalledTimes(1);
@@ -108,7 +114,9 @@ describe('useOn', () => {
       </KernelProvider>
     );
 
-    await kernel.emit('test:event', { value: 1 });
+    await act(async () => {
+      await kernel.emit('test:event', { value: 1 });
+    });
 
     await waitFor(() => {
       expect(handler).toHaveBeenCalledTimes(1);
@@ -202,7 +210,9 @@ describe('useOn', () => {
       </KernelProvider>
     );
 
-    await kernel.emit('user:login', { userId: 'test-123' });
+    await act(async () => {
+      await kernel.emit('user:login', { userId: 'test-123' });
+    });
 
     await waitFor(() => {
       expect(handler).toHaveBeenCalledTimes(1);
@@ -227,8 +237,10 @@ describe('useOn', () => {
       </KernelProvider>
     );
 
-    await kernel.emit('event:a', { source: 'a' });
-    await kernel.emit('event:b', { source: 'b' });
+    await act(async () => {
+      await kernel.emit('event:a', { source: 'a' });
+      await kernel.emit('event:b', { source: 'b' });
+    });
 
     await waitFor(() => {
       expect(handler).toHaveBeenCalledTimes(2);
@@ -253,8 +265,10 @@ describe('useOn', () => {
       </KernelProvider>
     );
 
-    await kernel.emit('test:event', { value: 1 });
-    await kernel.emit('test:event', { value: 2 });
+    await act(async () => {
+      await kernel.emit('test:event', { value: 1 });
+      await kernel.emit('test:event', { value: 2 });
+    });
 
     await waitFor(() => {
       expect(handler).toHaveBeenCalledTimes(1);
@@ -278,7 +292,9 @@ describe('useOn', () => {
       </KernelProvider>
     );
 
-    await kernel.emit('test:event', {});
+    await act(async () => {
+      await kernel.emit('test:event', {});
+    });
 
     await waitFor(() => {
       expect(handler1).toHaveBeenCalledTimes(1);

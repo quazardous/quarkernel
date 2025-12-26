@@ -26,15 +26,29 @@ const rejectionHandler = (reason: any) => {
   const message = reason?.message || String(reason);
   const isExpected = expectedRejectionPatterns.some(pattern => message.includes(pattern));
   if (!isExpected) {
-    console.error('Unexpected unhandled rejection in worker integration test:', reason);
+    originalConsoleError('Unexpected unhandled rejection in worker integration test:', reason);
   }
 };
 
+// Suppress expected error messages from appearing in test output
+let originalConsoleError: typeof console.error;
+
 beforeAll(() => {
+  originalConsoleError = console.error;
+  console.error = (...args: any[]) => {
+    const message = args.map(a => String(a)).join(' ');
+    const isExpected = expectedRejectionPatterns.some(pattern => message.includes(pattern));
+    if (isExpected) {
+      // Silent - these are expected test scenarios, no output needed
+    } else {
+      originalConsoleError(...args);
+    }
+  };
   process.on('unhandledRejection', rejectionHandler);
 });
 
 afterAll(() => {
+  console.error = originalConsoleError;
   process.off('unhandledRejection', rejectionHandler);
 });
 

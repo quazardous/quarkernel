@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    setupFiles: ['./src/adapters/worker/test-setup.ts'],
     /**
      * Why dangerouslyIgnoreUnhandledErrors is needed:
      *

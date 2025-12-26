@@ -24,15 +24,29 @@ const rejectionHandler = (reason: any) => {
   const message = reason?.message || String(reason);
   const isExpected = expectedRejectionPatterns.some(pattern => message.includes(pattern));
   if (!isExpected) {
-    console.error('Unexpected unhandled rejection in worker bridge test:', reason);
+    originalConsoleError('Unexpected unhandled rejection in worker bridge test:', reason);
   }
 };
 
+// Reformat expected error messages to be clearly labeled as test scenarios
+let originalConsoleError: typeof console.error;
+
 beforeAll(() => {
+  originalConsoleError = console.error;
+  console.error = (...args: any[]) => {
+    const message = args.map(a => String(a)).join(' ');
+    const isExpected = expectedRejectionPatterns.some(pattern => message.includes(pattern));
+    if (isExpected) {
+      // Silent - these are expected test scenarios, no output needed
+    } else {
+      originalConsoleError(...args);
+    }
+  };
   process.on('unhandledRejection', rejectionHandler);
 });
 
 afterAll(() => {
+  console.error = originalConsoleError;
   process.off('unhandledRejection', rejectionHandler);
 });
 

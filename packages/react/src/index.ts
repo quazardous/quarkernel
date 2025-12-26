@@ -40,4 +40,4 @@ export { KernelProvider, type KernelProviderProps } from './KernelProvider.js';
 // Hooks
 export { useKernel, KernelProviderError } from './useKernel.js';
 export { useOn } from './useOn.js';
-export { useEventState } from './useEventState.js';
+export { useEventState, type EventStateSelector, type UseEventStateOptions } from './useEventState.js';
