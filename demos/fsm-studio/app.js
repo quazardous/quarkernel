@@ -1064,7 +1064,13 @@ window.loadExample = async (name) => {
   try {
     const machineName = example.id;
 
-    // Destroy previous machine if exists
+    // Destroy CURRENT machine first (not just same-name machine)
+    if (currentMachine?.destroy) {
+      currentMachine.destroy();
+      delete machines[currentMachineName];
+    }
+
+    // Also destroy if a machine with this name already exists
     if (machines[machineName]?.destroy) {
       machines[machineName].destroy();
     }
