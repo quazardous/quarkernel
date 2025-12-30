@@ -26,7 +26,7 @@
         nodes: {
           shape: 'box',
           margin: 10,
-          font: { face: 'Comic Sans MS, cursive', size: 14 },
+          font: { face: 'system-ui, -apple-system, sans-serif', size: 14 },
           borderWidth: 2,
           shadow: true
         },

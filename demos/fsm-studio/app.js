@@ -591,12 +591,13 @@ function renderGraph() {
     network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
 
     // Click on edge to fire transition
-    network.on('selectEdge', (params) => {
+    network.on('selectEdge', async (params) => {
       if (params.edges.length === 1) {
         const edgeId = params.edges[0];
         const edge = edgesDataSet.get(edgeId);
         if (edge && edge.event && currentMachine.can(edge.event)) {
-          currentMachine.send(edge.event);
+          await currentMachine.send(edge.event);
+          updateUI();
           network.unselectAll();
         }
       }
@@ -763,7 +764,10 @@ function updateTransitionsAndGraph() {
     const btn = document.createElement('button');
     btn.className = 'btn btn-primary';
     btn.textContent = t;
-    btn.onclick = () => currentMachine.send(t);
+    btn.onclick = async () => {
+      await currentMachine.send(t);
+      updateUI();
+    };
     transitionsEl.appendChild(btn);
   }
 
@@ -947,8 +951,9 @@ window.toggleSection = (id) => {
 };
 
 // ===== Force Actions =====
-window.forceReset = () => {
-  currentMachine.send('FORCE_RESET', null, { force: true });
+window.forceReset = async () => {
+  await currentMachine.send('FORCE_RESET', null, { force: true });
+  updateUI();
 };
 
 function updateForceToDropdown() {
@@ -970,9 +975,9 @@ function updateForceToDropdown() {
   select.innerHTML = `<option value="" disabled selected>Force to</option>${options}`;
 }
 
-window.forceToStateSelect = (state) => {
+window.forceToStateSelect = async (state) => {
   if (!state) return;
-  currentMachine.send('FORCE', null, { force: true, target: state });
+  await currentMachine.send('FORCE', null, { force: true, target: state });
   log(`Forced to state: ${state}`, 'transition');
   updateUI();
 };

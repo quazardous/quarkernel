@@ -5,13 +5,16 @@ All notable changes to QuarKernel will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [2.3.1] - 2025-12-30
+## [2.3.2] - 2025-12-30
 
 ### Fixed
 - **FSM Studio**: Memory leak when loading new examples
   - Previous machine was not destroyed, causing old timers/listeners to continue running
   - Now properly destroys current machine before loading a new example
-- **QK Studio**: Changed font from Comic Sans MS to system-ui font stack
+- **FSM Studio**: Manual transitions not updating UI
+  - `createMachine()` uses internal kernel, so FSM Studio's event listeners didn't receive events
+  - Added `updateUI()` call after `send()` in transition buttons, graph edge clicks, and force actions
+- **QK Studio**: Changed font from Comic Sans MS to system-ui font stack (body + vis.js flowchart)
 
 ## [2.3.0] - 2025-12-26
 
