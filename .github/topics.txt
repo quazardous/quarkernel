@@ -1,0 +1,10 @@
+event-emitter
+event-bus
+typescript
+state-machine
+fsm
+event-driven
+orchestration
+zero-dependencies
+vue
+react
