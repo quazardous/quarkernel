@@ -35,4 +35,5 @@ pnpm-debug.log*
 
 # Temporary files
 *.tmp
+*.backup
 .cache

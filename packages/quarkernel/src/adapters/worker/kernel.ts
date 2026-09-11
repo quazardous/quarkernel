@@ -13,7 +13,7 @@
  * - Origin tracking prevents infinite message loops
  */
 
-import type { Kernel, EventMap, KernelEvent } from '../../types.js';
+import type { IKernel, EventMap, IKernelEvent } from '../../types.js';
 
 /**
  * Internal message types for worker communication
@@ -64,7 +64,7 @@ export interface WorkerKernel {
  * ```
  */
 export function createWorkerKernel<Events extends EventMap = EventMap>(
-  kernel: Kernel<Events>,
+  kernel: IKernel<Events>,
   options: WorkerKernelOptions = {}
 ): WorkerKernel {
   const { debug = false } = options;
@@ -106,7 +106,7 @@ export function createWorkerKernel<Events extends EventMap = EventMap>(
    * Subscribe to all kernel events and forward to main thread
    * Uses wildcard pattern ** to capture all events
    */
-  const unbindWildcard = kernel.on('**' as keyof Events, (event: KernelEvent) => {
+  const unbindWildcard = kernel.on('**' as keyof Events, (event: IKernelEvent) => {
     // Forward event to main thread
     const message: WorkerMessage = {
       type: 'event',

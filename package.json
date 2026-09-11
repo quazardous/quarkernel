@@ -19,8 +19,8 @@
   },
   "scripts": {
     "build": "npm --workspaces run build",
-    "test": "npm --workspaces run test",
-    "clean": "npm --workspaces run clean && rm -rf node_modules"
+    "test": "npm --workspaces --if-present run test",
+    "clean": "npm --workspaces --if-present run clean && rm -rf node_modules"
   },
   "devDependencies": {},
   "keywords": [

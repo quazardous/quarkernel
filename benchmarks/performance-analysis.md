@@ -2,11 +2,13 @@
 
 Internal documentation for optimizing QuarKernel performance.
 
+> **Status (2.3.3):** bottlenecks 1 and 2 are addressed. `emit()` / `emitSerial()` resolve their listeners through `resolveListeners()`, which caches the matched listeners grouped by dependency level per event name and clears the cache on any `on()` / `off()` / `offAll()`. Bottlenecks 3 to 5 are still open. Code excerpts below show the code as it was when the analysis was written.
+
 ---
 
 ## Identified Bottlenecks
 
-### 1. `emit()` - Pattern Matching (kernel.ts:219-222)
+### 1. `emit()` - Pattern Matching (resolved in 2.3.3: cached per event name)
 
 ```typescript
 // Current: O(n) array creation + O(n) filter on EVERY emit
@@ -22,7 +24,7 @@ const matchingPatterns = this.options.wildcard
 
 ---
 
-### 2. `emit()` - Dependency Sorting (kernel.ts:258)
+### 2. `emit()` - Dependency Sorting (resolved in 2.3.3: cached, single-pass levels)
 
 ```typescript
 // Current: Called EVERY emit, even when no dependencies exist

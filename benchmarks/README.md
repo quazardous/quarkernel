@@ -43,6 +43,22 @@ Default listeners: 10
 
 **Operations per second (higher is better)**
 
+> These results predate 2.3.3 and have not been re-run on a quiet machine since. Compare libraries within a single run only: absolute numbers vary a lot with CPU load.
+
+### Execution plan cache (2.3.3)
+
+Since 2.3.3, `emit()` caches the listeners resolved for each event name (pattern matching plus dependency levels) until the listeners change. Measured in a single process by alternating runs of two kernels from the same build, one of them with the cache disabled (median of 7 runs):
+
+| Scenario | Cache on vs off |
+|----------|----------------:|
+| Simple emit (10 listeners) | 1.24x faster |
+| Many listeners (100) | 1.07x faster |
+| Wildcard pattern (`user:*`) | 1.66x faster |
+| Dependencies (3 levels) | 1.78x faster |
+| 10 event types + 10 wildcard patterns | 2.94x faster |
+
+The gain is largest when many patterns are registered or listeners have dependencies. With many listeners on one event, per-listener work (context creation, promises) dominates.
+
 ---
 
 ## Unique Features (QuarKernel only)

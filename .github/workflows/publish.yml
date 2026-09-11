@@ -29,6 +29,12 @@ jobs:
       - name: Build all packages
         run: npm run build
 
+      - name: Type check
+        run: npm run typecheck --workspace=packages/quarkernel
+
+      - name: Check bundle size
+        run: npm run size --workspace=packages/quarkernel
+
       - name: Run tests
         run: npm test --workspace=packages/quarkernel --workspace=packages/react --workspace=packages/vue --workspace=packages/svelte
 

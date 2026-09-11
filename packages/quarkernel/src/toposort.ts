@@ -90,7 +90,8 @@ export const toposort = (nodes: TopoNode[]): string[] => {
   }
 
   // Return only the IDs that were in the original input
-  return result.filter(id => nodes.some(n => n.id === id));
+  const inputIds = new Set(nodes.map(n => n.id));
+  return result.filter(id => inputIds.has(id));
 };
 
 /**

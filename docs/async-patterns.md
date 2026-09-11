@@ -12,7 +12,7 @@ FSM      →  Track state
 
 ### QK: `emit()` → `Promise<void>`
 
-Resolves when **all listeners complete** (parallel by default).
+Resolves when **all listeners complete** (parallel by default; listeners with `after` wait for their dependencies to complete).
 
 ```typescript
 await qk.emit('event', data);

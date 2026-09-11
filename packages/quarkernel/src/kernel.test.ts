@@ -843,6 +843,292 @@ describe('Dependency Resolution (T118)', () => {
     });
   });
 
+  describe('Async dependency ordering', () => {
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    it('should wait for an async dependency to complete before running dependents', async () => {
+      const kernel = createKernel<TestEvents>();
+      const log: string[] = [];
+
+      kernel.on('test:simple', async (event) => {
+        log.push('stock:start');
+        await sleep(20);
+        event.context.inventory = 42;
+        log.push('stock:end');
+      }, { id: 'stock' });
+
+      kernel.on('test:simple', async (event) => {
+        log.push(`pay:inventory=${event.context.inventory}`);
+      }, { id: 'pay', after: ['stock'] });
+
+      await kernel.emit('test:simple', { value: 1 });
+
+      expect(log).toEqual(['stock:start', 'stock:end', 'pay:inventory=42']);
+    });
+
+    it('should wait for a chain of async dependencies', async () => {
+      const kernel = createKernel<TestEvents>();
+      const log: string[] = [];
+
+      kernel.on('test:simple', async () => {
+        log.push('a:start');
+        await sleep(15);
+        log.push('a:end');
+      }, { id: 'a' });
+
+      kernel.on('test:simple', async () => {
+        log.push('b:start');
+        await sleep(5);
+        log.push('b:end');
+      }, { id: 'b', after: ['a'] });
+
+      kernel.on('test:simple', async () => {
+        log.push('c:start');
+        log.push('c:end');
+      }, { id: 'c', after: ['b'] });
+
+      await kernel.emit('test:simple', { value: 1 });
+
+      expect(log).toEqual(['a:start', 'a:end', 'b:start', 'b:end', 'c:start', 'c:end']);
+    });
+
+    it('should wait for every dependency of a diamond before running the join', async () => {
+      const kernel = createKernel<TestEvents>();
+      const log: string[] = [];
+
+      kernel.on('test:simple', async (event) => {
+        await sleep(5);
+        event.context.user = 'u1';
+        log.push('a:end');
+      }, { id: 'a' });
+
+      kernel.on('test:simple', async (event) => {
+        log.push('b:start');
+        await sleep(20);
+        event.context.profile = `${event.context.user}:profile`;
+        log.push('b:end');
+      }, { id: 'b', after: ['a'] });
+
+      kernel.on('test:simple', async (event) => {
+        log.push('c:start');
+        await sleep(5);
+        event.context.settings = `${event.context.user}:settings`;
+        log.push('c:end');
+      }, { id: 'c', after: ['a'] });
+
+      kernel.on('test:simple', async (event) => {
+        log.push(`d:${event.context.profile},${event.context.settings}`);
+      }, { id: 'd', after: ['b', 'c'] });
+
+      await kernel.emit('test:simple', { value: 1 });
+
+      expect(log[0]).toBe('a:end');
+      expect(log[log.length - 1]).toBe('d:u1:profile,u1:settings');
+    });
+
+    it('should run listeners of the same level in parallel', async () => {
+      const kernel = createKernel<TestEvents>();
+      const log: string[] = [];
+
+      kernel.on('test:simple', async () => {
+        log.push('root');
+      }, { id: 'root' });
+
+      kernel.on('test:simple', async () => {
+        log.push('x:start');
+        await sleep(10);
+        log.push('x:end');
+      }, { id: 'x', after: ['root'] });
+
+      kernel.on('test:simple', async () => {
+        log.push('y:start');
+        await sleep(10);
+        log.push('y:end');
+      }, { id: 'y', after: ['root'] });
+
+      await kernel.emit('test:simple', { value: 1 });
+
+      // Both same-level listeners start before either one finishes
+      expect(log.slice(0, 3)).toEqual(['root', 'x:start', 'y:start']);
+    });
+
+    it('should still run dependents when a dependency throws (errorBoundary: true)', async () => {
+      const onError = vi.fn();
+      const kernel = createKernel<TestEvents>({ onError });
+      const dependent = vi.fn();
+
+      kernel.on('test:simple', async () => {
+        await sleep(5);
+        throw new Error('dependency failed');
+      }, { id: 'failing' });
+
+      kernel.on('test:simple', dependent, { id: 'dependent', after: ['failing'] });
+
+      await kernel.emit('test:simple', { value: 1 });
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(dependent).toHaveBeenCalledTimes(1);
+    });
+
+    it('should collect errors from all levels when errorBoundary is false', async () => {
+      const kernel = createKernel<TestEvents>({ errorBoundary: false });
+      const last = vi.fn();
+
+      kernel.on('test:simple', async () => {
+        await sleep(5);
+        throw new Error('level 0');
+      }, { id: 'a' });
+
+      kernel.on('test:simple', async () => {
+        throw new Error('level 1');
+      }, { id: 'b', after: ['a'] });
+
+      kernel.on('test:simple', last, { id: 'c', after: ['b'] });
+
+      const error = await kernel.emit('test:simple', { value: 1 }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(AggregateError);
+      expect((error as AggregateError).errors.map((e: Error) => e.message)).toEqual(['level 0', 'level 1']);
+      expect(last).toHaveBeenCalledTimes(1);
+    });
+
+    it('should skip dependents when an async dependency stops propagation', async () => {
+      const kernel = createKernel<TestEvents>();
+      const dependent = vi.fn();
+
+      kernel.on('test:simple', async (event) => {
+        await sleep(5);
+        event.stopPropagation();
+      }, { id: 'guard' });
+
+      kernel.on('test:simple', dependent, { id: 'dependent', after: ['guard'] });
+
+      await kernel.emit('test:simple', { value: 1 });
+
+      expect(dependent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Execution plan cache', () => {
+    it('should include listeners added after a previous emit', async () => {
+      const kernel = createKernel<TestEvents>();
+      const exact = vi.fn();
+      const later = vi.fn();
+      const wildcard = vi.fn();
+
+      kernel.on('test:simple', exact);
+      await kernel.emit('test:simple', { value: 1 });
+
+      kernel.on('test:simple', later);
+      kernel.on('test:*' as keyof TestEvents, wildcard);
+      await kernel.emit('test:simple', { value: 2 });
+
+      expect(exact).toHaveBeenCalledTimes(2);
+      expect(later).toHaveBeenCalledTimes(1);
+      expect(wildcard).toHaveBeenCalledTimes(1);
+    });
+
+    it('should skip listeners removed with off() after a previous emit', async () => {
+      const kernel = createKernel<TestEvents>();
+      const listener = vi.fn();
+
+      kernel.on('test:simple', listener);
+      await kernel.emit('test:simple', { value: 1 });
+
+      kernel.off('test:simple', listener);
+      await kernel.emit('test:simple', { value: 2 });
+
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it('should skip listeners removed by offAll() after a previous emit', async () => {
+      const kernel = createKernel<TestEvents>();
+      const listener = vi.fn();
+
+      kernel.on('test:simple', listener);
+      await kernel.emit('test:simple', { value: 1 });
+
+      kernel.offAll();
+      await kernel.emit('test:simple', { value: 2 });
+
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it('should skip listeners whose signal was aborted after a previous emit', async () => {
+      const kernel = createKernel<TestEvents>();
+      const controller = new AbortController();
+      const listener = vi.fn();
+
+      kernel.on('test:simple', listener, { signal: controller.signal });
+      await kernel.emit('test:simple', { value: 1 });
+
+      controller.abort();
+      await kernel.emit('test:simple', { value: 2 });
+
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not call a once listener again from a cached plan', async () => {
+      const kernel = createKernel<TestEvents>();
+      const onceListener = vi.fn();
+      const regular = vi.fn();
+
+      kernel.on('test:simple', onceListener, { once: true });
+      kernel.on('test:simple', regular);
+
+      await kernel.emit('test:simple', { value: 1 });
+      await kernel.emit('test:simple', { value: 2 });
+
+      expect(onceListener).toHaveBeenCalledTimes(1);
+      expect(regular).toHaveBeenCalledTimes(2);
+    });
+
+    it('should report a missing dependency on every emit until it is registered', async () => {
+      const kernel = createKernel<TestEvents>();
+      const order: string[] = [];
+
+      kernel.on('test:simple', () => { order.push('b'); }, { id: 'b', after: ['a'] });
+
+      await expect(kernel.emit('test:simple', { value: 1 })).rejects.toThrow('missing listener "a"');
+      await expect(kernel.emit('test:simple', { value: 2 })).rejects.toThrow('missing listener "a"');
+
+      kernel.on('test:simple', () => { order.push('a'); }, { id: 'a' });
+      await kernel.emit('test:simple', { value: 3 });
+
+      expect(order).toEqual(['a', 'b']);
+    });
+
+    it('should keep resolving correctly beyond the cache limit', async () => {
+      const kernel = createKernel();
+      const listener = vi.fn();
+
+      kernel.on('item:*', listener);
+
+      for (let i = 0; i < 1100; i++) {
+        await kernel.emit(`item:${i}`);
+      }
+      await kernel.emit('item:0');
+
+      expect(listener).toHaveBeenCalledTimes(1101);
+    });
+
+    it('should keep the plan of an emit in progress when listeners change during it', async () => {
+      const kernel = createKernel<TestEvents>();
+      const dependent = vi.fn();
+
+      kernel.on('test:simple', () => {
+        kernel.off('test:simple', dependent);
+      }, { id: 'remover' });
+      kernel.on('test:simple', dependent, { id: 'dependent', after: ['remover'] });
+
+      await kernel.emit('test:simple', { value: 1 });
+      await kernel.emit('test:simple', { value: 2 });
+
+      // Removed during the first emit: still runs in that emit, not in the next one
+      expect(dependent).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('No dependencies optimization', () => {
     it('should skip toposort when no dependencies exist', async () => {
       const kernel = createKernel<TestEvents>();

@@ -6,7 +6,7 @@
 
 **Event orchestration with dependency ordering, shared context, and state machines.**
 
-TypeScript-first. Zero dependencies. < 2KB gzipped.
+TypeScript-first. Zero dependencies. ~4.6 kB gzipped for the kernel, state machines in a separate entry ([sizes](#size)).
 
 [![Try QK Studio](https://img.shields.io/badge/Try_it_live-QK_Studio-blue?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlnb24gcG9pbnRzPSI1IDMgMTkgMTIgNSAyMSA1IDMiPjwvcG9seWdvbj48L3N2Zz4=)](https://quazardous.github.io/quarkernel/qk-studio/)
 [![Try FSM Studio](https://img.shields.io/badge/Try_it_live-FSM_Studio-purple?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiPjxjaXJjbGUgY3g9IjYiIGN5PSIxMiIgcj0iMyIvPjxjaXJjbGUgY3g9IjE4IiBjeT0iMTIiIHI9IjMiLz48bGluZSB4MT0iOSIgeTE9IjEyIiB4Mj0iMTUiIHkyPSIxMiIvPjwvc3ZnPg==)](https://quazardous.github.io/quarkernel/fsm-studio/)
@@ -27,15 +27,24 @@ qk.on('user:login', (e) => greet(e.context.user));       // Shared context
 
 **What makes it different:**
 
-| Feature | mitt | emittery | **QuarKernel** |
-|---------|:----:|:--------:|:--------------:|
-| Dependency ordering | - | - | **Yes** |
-| Shared context | - | - | **Yes** |
-| Composite events | - | - | **Yes** |
-| Wildcards | - | - | **Yes** |
-| Async/await | - | Yes | **Yes** |
-| TypeScript | Yes | Yes | **Yes** |
-| < 2KB | Yes | Yes | **Yes** |
+mitt and eventemitter3 are simple synchronous event buses, and much smaller. emittery adds async listeners. QuarKernel is for when listeners must be orchestrated: run in a given order, share data, and react to combinations of events.
+
+| Feature | mitt | eventemitter3 | emittery | **QuarKernel** |
+|---------|:----:|:-------------:|:--------:|:--------------:|
+| Awaitable `emit()` (async listeners) | - | - | Yes | **Yes** |
+| Serial emit | - | - | Yes | **Yes** |
+| Promise-based `once()` | - | - | Yes | **Yes** |
+| Catch-all listener | Yes (`*`) | - | Yes (`onAny`) | **Yes** |
+| Wildcard patterns (`user:*`) | - | - | - | **Yes** |
+| Listener priority | - | - | - | **Yes** |
+| Dependency ordering (`after`) | - | - | - | **Yes** |
+| Shared context per emit | - | - | - | **Yes** |
+| Composite events | - | - | - | **Yes** |
+| State machines | - | - | - | **Yes** (`/fsm`) |
+| TypeScript types | Yes | Yes | Yes | **Yes** |
+| Size (min + gzip) | 0.2 kB | 1.3 kB | 2.2 kB | **4.6 kB** (`createKernel`) |
+
+<sub>Sizes measured with esbuild (minified ESM) + gzip: mitt 3.0.1, eventemitter3 5.0.4, emittery 1.2.0, QuarKernel 2.3.3.</sub>
 
 ---
 
@@ -49,6 +58,21 @@ npm install @quazardous/quarkernel
 <!-- CDN -->
 <script src="https://unpkg.com/@quazardous/quarkernel@2/dist/index.umd.js"></script>
 ```
+
+### Size
+
+Minified + gzipped, measured with esbuild on 2.3.3. The publish workflow enforces a budget per entry point (`npm run size --workspace=packages/quarkernel`).
+
+| Import | min + gzip |
+|--------|-----------:|
+| `@quazardous/quarkernel`, `createKernel` only | 4.6 kB |
+| `@quazardous/quarkernel`, whole entry | 7.4 kB |
+| `@quazardous/quarkernel/fsm` | 5.9 kB (includes the kernel, shared with the core entry) |
+| `@quazardous/quarkernel/xstate` | 1.1 kB |
+
+The ES module entries share a single copy of the kernel, so importing both the core and `/fsm` adds nothing on top of `/fsm`. The CommonJS builds (`require`) are self-contained: requiring both loads the kernel twice.
+
+Latest published version: [![core size](https://deno.bundlejs.com/badge?q=@quazardous/quarkernel)](https://bundlejs.com/?q=@quazardous/quarkernel) core, [![fsm size](https://deno.bundlejs.com/badge?q=@quazardous/quarkernel/fsm)](https://bundlejs.com/?q=@quazardous/quarkernel/fsm) fsm
 
 ---
 

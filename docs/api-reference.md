@@ -222,7 +222,7 @@ qk.offAll();
 
 ##### emit()
 
-Emit an event and execute all matching listeners in parallel (respecting dependency order).
+Emit an event and execute matching listeners level by level: listeners in the same dependency level run in parallel, and each level completes before the next one starts. Listeners without dependencies all run in parallel. A failing dependency does not skip its dependents; `stopPropagation()` skips the remaining levels.
 
 **Signature:**
 ```typescript

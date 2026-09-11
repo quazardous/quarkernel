@@ -12,7 +12,7 @@
  * - Origin tracking: Prevents infinite message loops
  */
 
-import type { Kernel, EventMap, ListenerFunction, ListenerOptions, KernelEvent } from '../../types.js';
+import type { IKernel, EventMap, ListenerFunction, ListenerOptions, IKernelEvent } from '../../types.js';
 
 /**
  * Internal message types for worker communication
@@ -38,7 +38,7 @@ export interface WorkerBridgeOptions {
  */
 export interface WorkerBridge<Events extends EventMap = EventMap> {
   /** Kernel-compatible API */
-  kernel: Kernel<Events>;
+  kernel: IKernel<Events>;
 
   /** Check if worker is ready */
   readonly ready: boolean;
@@ -153,7 +153,7 @@ export function createWorkerBridge<Events extends EventMap = EventMap>(
         const eventListeners = listeners.get(message.name);
         if (eventListeners && eventListeners.size > 0) {
           // Create a simple kernel event object
-          const kernelEvent: KernelEvent = {
+          const kernelEvent: IKernelEvent = {
             name: message.name,
             data: message.data,
             context: {},
@@ -228,7 +228,7 @@ export function createWorkerBridge<Events extends EventMap = EventMap>(
   /**
    * Proxy kernel implementation
    */
-  const proxyKernel: Kernel<Events> = {
+  const proxyKernel: IKernel<Events> = {
     on<K extends keyof Events>(
       event: K | K[],
       listener: ListenerFunction<Events[K]>,
@@ -274,7 +274,7 @@ export function createWorkerBridge<Events extends EventMap = EventMap>(
       return new Promise((resolve, reject) => {
         let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-        const unbind = this.on(event, (evt) => {
+        const unbind = this.on(event, (evt: IKernelEvent<Events[K]>) => {
           if (timeoutId) clearTimeout(timeoutId);
           unbind();
           resolve(evt);
@@ -327,7 +327,7 @@ export function createWorkerBridge<Events extends EventMap = EventMap>(
       throw new Error('compose() is not supported in worker bridge');
     },
 
-    events<K extends keyof Events>(): AsyncIterable<KernelEvent<Events[K]>> {
+    events<K extends keyof Events>(): AsyncIterable<IKernelEvent<Events[K]>> {
       throw new Error('events() is not supported in worker bridge');
     },
 
@@ -346,7 +346,7 @@ export function createWorkerBridge<Events extends EventMap = EventMap>(
       return Array.from(listeners.keys()) as (keyof Events)[];
     },
 
-    debug(enabled: boolean): void {
+    debug(): void {
       // Debug mode is set at bridge creation, cannot be changed dynamically
       if (debug) {
         console.debug('[WorkerBridge] Debug mode is set at creation time');

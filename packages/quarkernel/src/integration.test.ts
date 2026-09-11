@@ -341,7 +341,8 @@ describe('Stress Tests - High volume and concurrency (T131)', () => {
     });
 
     it('should handle concurrent emits with dependencies', async () => {
-      const kernel = createKernel<AppEvents>();
+      // errorBoundary: false so failed expectations inside listeners fail the test
+      const kernel = createKernel<AppEvents>({ errorBoundary: false });
       let totalExecutions = 0;
 
       // Simple counter-based dependency test

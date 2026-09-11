@@ -33,6 +33,22 @@ interface ExecutionError {
 }
 
 /**
+ * Listeners matching an event, ready to execute
+ */
+interface ExecutionPlan {
+  /** Listeners grouped by dependency level (priority order within each level) */
+  levels: ListenerEntry[][];
+  /** All levels flattened, in execution order */
+  entries: ListenerEntry[];
+}
+
+/**
+ * Maximum number of cached execution plans (one per event name)
+ * Keeps dynamic event names (e.g. `user:${id}`) from growing the cache forever
+ */
+const PLAN_CACHE_LIMIT = 1000;
+
+/**
  * Core Kernel class
  * Implements basic on(), off(), emit() with Map-based storage
  */
@@ -41,6 +57,8 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
   private options: Required<KernelOptions>;
   private listenerIdCounter = 0;
   private executionErrors: ExecutionError[] = [];
+  // Cleared on every listener change (on, off, offAll)
+  private planCache = new Map<string, ExecutionPlan>();
 
   constructor(options: KernelOptions = {}) {
     this.options = {
@@ -118,10 +136,11 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
     entries.push(entry);
 
     // Sort by priority (descending: higher priority first)
-    // Note: Dependency ordering is handled in emit() by sortListenersByDependencies()
+    // Note: Dependency ordering is handled in emit() by groupListenersByDependencyLevel()
     entries.sort((a, b) => b.priority - a.priority);
 
     this.listeners.set(event, entries);
+    this.clearPlanCache();
 
     if (this.options.debug) {
       console.debug('[QuarKernel] Listener added', {
@@ -204,6 +223,8 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
       return;
     }
 
+    this.clearPlanCache();
+
     if (!listener) {
       if (this.options.debug) {
         console.debug('[QuarKernel] All listeners removed', {
@@ -248,7 +269,8 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
 
   /**
    * Emit an event
-   * Executes all registered listeners in parallel (by default)
+   * Executes listeners level by level: listeners in the same dependency level
+   * run in parallel, and each level completes before the next one starts
    * Returns a Promise that resolves when all listeners complete
    * Throws AggregateError if any listeners failed
    */
@@ -258,22 +280,10 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
   ): Promise<void> {
     const event = String(eventName);
 
-    // Get all matching listeners (exact match + wildcards)
-    const allPatterns = Array.from(this.listeners.keys());
-    const matchingPatterns = this.options.wildcard
-      ? findMatchingPatterns(event, allPatterns, this.options.delimiter)
-      : allPatterns.filter(p => p === event);
+    // Matching listeners (exact match + wildcards) grouped by dependency level
+    const { levels, entries: sortedEntries } = this.resolveListeners(event);
 
-    // Collect all listeners from matching patterns
-    const allEntries: ListenerEntry[] = [];
-    for (const pattern of matchingPatterns) {
-      const entries = this.listeners.get(pattern);
-      if (entries) {
-        allEntries.push(...entries);
-      }
-    }
-
-    if (allEntries.length === 0) {
+    if (sortedEntries.length === 0) {
       if (this.options.debug) {
         console.debug('[QuarKernel] Event emitted (no listeners)', { event });
       }
@@ -283,7 +293,7 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
     if (this.options.debug) {
       console.debug('[QuarKernel] Event emitted', {
         event,
-        listenerCount: allEntries.length,
+        listenerCount: sortedEntries.length,
         data: data !== undefined ? JSON.stringify(data).substring(0, 100) : undefined,
       });
     }
@@ -297,16 +307,16 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
       {}
     );
 
-    // Sort listeners by dependencies and priority
-    const sortedEntries = this.sortListenersByDependencies(allEntries);
-
-    // Execute all listeners in parallel using Promise.allSettled
-    // to ensure one failure doesn't block others
-    const promises = sortedEntries.map((entry) =>
-      this.executeListener(entry, kernelEvent, event)
-    );
-
-    const results = await Promise.allSettled(promises);
+    // Execute each level in parallel using Promise.allSettled so one failure
+    // doesn't block others, and await it before starting the next level so
+    // dependents see what their async dependencies wrote to the context
+    const results: PromiseSettledResult<void>[] = [];
+    for (const level of levels) {
+      const levelResults = await Promise.allSettled(
+        level.map((entry) => this.executeListener(entry, kernelEvent, event))
+      );
+      results.push(...levelResults);
+    }
 
     // Remove once listeners after execution
     this.removeOnceListeners(event, sortedEntries, kernelEvent);
@@ -341,22 +351,10 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
   ): Promise<void> {
     const event = String(eventName);
 
-    // Get all matching listeners (exact match + wildcards)
-    const allPatterns = Array.from(this.listeners.keys());
-    const matchingPatterns = this.options.wildcard
-      ? findMatchingPatterns(event, allPatterns, this.options.delimiter)
-      : allPatterns.filter(p => p === event);
+    // Matching listeners (exact match + wildcards) in dependency level, then priority order
+    const { entries: sortedEntries } = this.resolveListeners(event);
 
-    // Collect all listeners from matching patterns
-    const allEntries: ListenerEntry[] = [];
-    for (const pattern of matchingPatterns) {
-      const entries = this.listeners.get(pattern);
-      if (entries) {
-        allEntries.push(...entries);
-      }
-    }
-
-    if (allEntries.length === 0) {
+    if (sortedEntries.length === 0) {
       if (this.options.debug) {
         console.debug('[QuarKernel] Event emitted serially (no listeners)', { event });
       }
@@ -366,7 +364,7 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
     if (this.options.debug) {
       console.debug('[QuarKernel] Event emitted serially', {
         event,
-        listenerCount: allEntries.length,
+        listenerCount: sortedEntries.length,
         data: data !== undefined ? JSON.stringify(data).substring(0, 100) : undefined,
       });
     }
@@ -379,9 +377,6 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
       data as Events[K],
       {}
     );
-
-    // Sort listeners by dependencies and priority
-    const sortedEntries = this.sortListenersByDependencies(allEntries);
 
     // Execute listeners sequentially
     const errors: Error[] = [];
@@ -416,69 +411,107 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
   }
 
   /**
-   * Sort listeners by dependencies and priority
-   * Uses topological sort for dependency resolution
+   * Drop cached execution plans after a listener change
+   * Skips the clear when nothing is cached (on/off are hot paths too)
    */
-  private sortListenersByDependencies(entries: ListenerEntry[]): ListenerEntry[] {
-    // If no dependencies, just return sorted by priority
+  private clearPlanCache(): void {
+    if (this.planCache.size > 0) {
+      this.planCache.clear();
+    }
+  }
+
+  /**
+   * Resolve the execution plan for an event: listeners registered under the
+   * event name or a matching wildcard pattern, grouped by dependency level
+   * Plans are cached per event name; any listener change clears the cache
+   * Throws on missing or cyclic dependencies (failed plans are not cached)
+   */
+  private resolveListeners(event: string): ExecutionPlan {
+    const cached = this.planCache.get(event);
+    if (cached) {
+      return cached;
+    }
+
+    const matchingPatterns = this.options.wildcard
+      ? findMatchingPatterns(event, Array.from(this.listeners.keys()), this.options.delimiter)
+      : this.listeners.has(event) ? [event] : [];
+
+    const allEntries: ListenerEntry[] = [];
+    for (const pattern of matchingPatterns) {
+      const entries = this.listeners.get(pattern);
+      if (entries) {
+        allEntries.push(...entries);
+      }
+    }
+
+    const levels = allEntries.length > 0 ? this.groupListenersByDependencyLevel(allEntries) : [];
+    const plan: ExecutionPlan = { levels, entries: levels.flat() };
+
+    if (this.planCache.size >= PLAN_CACHE_LIMIT) {
+      // Evict the oldest plan (Map keeps insertion order)
+      this.planCache.delete(this.planCache.keys().next().value!);
+    }
+    this.planCache.set(event, plan);
+
+    return plan;
+  }
+
+  /**
+   * Group listeners into dependency levels
+   * Level 0 listeners have no dependencies; a level N listener only depends on
+   * listeners from lower levels. Each level is sorted by priority (highest first)
+   * Uses topological sort for dependency validation
+   */
+  private groupListenersByDependencyLevel(entries: ListenerEntry[]): ListenerEntry[][] {
+    const byPriority = (a: ListenerEntry, b: ListenerEntry) => b.priority - a.priority;
+
+    // If no dependencies, a single level sorted by priority
     const hasDependencies = entries.some(e => e.after.length > 0);
     if (!hasDependencies) {
-      return [...entries].sort((a, b) => b.priority - a.priority);
+      return [[...entries].sort(byPriority)];
+    }
+
+    // Index listeners by id (several listeners may share an id)
+    const entriesById = new Map<string, ListenerEntry[]>();
+    for (const entry of entries) {
+      const sameId = entriesById.get(entry.id);
+      if (sameId) {
+        sameId.push(entry);
+      } else {
+        entriesById.set(entry.id, [entry]);
+      }
     }
 
     // Check for missing dependencies
-    const listenerIds = new Set(entries.map(e => e.id));
     for (const entry of entries) {
       for (const dep of entry.after) {
-        if (!listenerIds.has(dep)) {
+        if (!entriesById.has(dep)) {
           throw new Error(`Listener "${entry.id}" depends on missing listener "${dep}"`);
         }
       }
     }
 
-    // Convert to TopoNode format
-    const nodes: TopoNode[] = entries.map(e => ({
-      id: e.id,
-      after: e.after,
-    }));
-
-    // Get topologically sorted IDs (validates dependencies, unused but required for validation)
-    toposort(nodes);
-
-    // Group by dependency level and sort by priority within each level
-    const levelMap = new Map<string, number>();
-    const assignLevel = (id: string, visited = new Set<string>()): number => {
-      if (levelMap.has(id)) {
-        return levelMap.get(id)!;
+    // Topological order lists every id after its dependencies (throws on cycles),
+    // so one pass puts each id one level above its deepest dependency
+    const nodes: TopoNode[] = entries.map(e => ({ id: e.id, after: e.after }));
+    const levelById = new Map<string, number>();
+    for (const id of toposort(nodes)) {
+      let level = 0;
+      for (const entry of entriesById.get(id)!) {
+        for (const dep of entry.after) {
+          level = Math.max(level, levelById.get(dep)! + 1);
+        }
       }
-      if (visited.has(id)) {
-        return 0;
-      }
-      visited.add(id);
+      levelById.set(id, level);
+    }
 
-      const entry = entries.find(e => e.id === id);
-      if (!entry || entry.after.length === 0) {
-        levelMap.set(id, 0);
-        return 0;
-      }
-
-      const maxDepLevel = Math.max(...entry.after.map(dep => assignLevel(dep, visited)));
-      const level = maxDepLevel + 1;
-      levelMap.set(id, level);
-      return level;
-    };
-
-    entries.forEach(e => assignLevel(e.id));
-
-    // Sort by level, then by priority within level
-    return [...entries].sort((a, b) => {
-      const levelA = levelMap.get(a.id) ?? 0;
-      const levelB = levelMap.get(b.id) ?? 0;
-      if (levelA !== levelB) {
-        return levelA - levelB; // Lower level first
-      }
-      return b.priority - a.priority; // Higher priority first within same level
-    });
+    // Bucket by level (levels are contiguous: a level N listener depends on a
+    // level N-1 one), then sort by priority within each level
+    const levels: ListenerEntry[][] = [];
+    for (const entry of entries) {
+      (levels[levelById.get(entry.id)!] ??= []).push(entry);
+    }
+    return levels.map(level => level.sort(byPriority));
   }
 
   /**
@@ -654,6 +687,8 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
    * Remove all listeners for all events (or specific event)
    */
   offAll(eventName?: keyof Events): void {
+    this.clearPlanCache();
+
     if (!eventName) {
       // Cleanup all abort listeners
       for (const entries of this.listeners.values()) {

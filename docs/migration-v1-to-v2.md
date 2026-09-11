@@ -594,7 +594,7 @@ qk.on('event', handler3, { id: 'C', after: ['A', 'B'] });  // Multiple deps
 ### 1. Serial Execution
 
 ```typescript
-// Parallel (default) - all listeners start concurrently
+// Parallel (default) - listeners start concurrently, each dependency level waits for the previous one
 await qk.emit('event', data);
 
 // Serial - wait for each listener before starting next
