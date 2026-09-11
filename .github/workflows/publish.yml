@@ -67,7 +67,7 @@ jobs:
       - name: Publish @quazardous/quarkernel
         run: |
           echo "Publishing @quazardous/quarkernel@${{ steps.npm-tag.outputs.version }} with tag '${{ steps.npm-tag.outputs.tag }}'"
-          npm publish --workspace=packages/quarkernel --tag ${{ steps.npm-tag.outputs.tag }} --provenance --access public --loglevel verbose
+          npm publish --workspace=packages/quarkernel --tag ${{ steps.npm-tag.outputs.tag }} --provenance --access public
 
       - name: Publish @quazardous/quarkernel-vue
         run: npm publish --workspace=packages/vue --tag ${{ steps.npm-tag.outputs.tag }} --provenance --access public
