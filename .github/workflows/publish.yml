@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -22,6 +23,10 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
+
+      # npm trusted publishing (OIDC, no token) needs npm >= 11.5.1; Node 20 ships npm 10
+      - name: Update npm
+        run: npm install -g npm@^11.5.1
 
       - name: Install dependencies
         run: npm ci
@@ -59,23 +64,15 @@ jobs:
         run: |
           echo "Publishing @quazardous/quarkernel@${{ steps.npm-tag.outputs.version }} with tag '${{ steps.npm-tag.outputs.tag }}'"
           npm publish --workspace=packages/quarkernel --tag ${{ steps.npm-tag.outputs.tag }} --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @quazardous/quarkernel-vue
         run: npm publish --workspace=packages/vue --tag ${{ steps.npm-tag.outputs.tag }} --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         continue-on-error: true
 
       - name: Publish @quazardous/quarkernel-react
         run: npm publish --workspace=packages/react --tag ${{ steps.npm-tag.outputs.tag }} --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         continue-on-error: true
 
       - name: Publish @quazardous/quarkernel-svelte
         run: npm publish --workspace=packages/svelte --tag ${{ steps.npm-tag.outputs.tag }} --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         continue-on-error: true
