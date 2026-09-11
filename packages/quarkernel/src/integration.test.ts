@@ -13,6 +13,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createKernel } from './kernel.js';
 import type { ListenerFunction } from './types.js';
+import { medianDurationAsync } from '../tests/helpers/timing.js';
 
 interface AppEvents {
   'app:init': undefined;
@@ -287,29 +288,22 @@ describe('Stress Tests - High volume and concurrency (T131)', () => {
     it('should handle rapid add/remove cycles without degradation', async () => {
       const kernel = createKernel<AppEvents>();
 
-      // Measure time for first 100 cycles
-      const start1 = Date.now();
-      for (let i = 0; i < 100; i++) {
-        const listener = vi.fn();
-        kernel.on('test:event', listener);
-        await kernel.emit('test:event', { value: i });
-        kernel.off('test:event', listener);
-      }
-      const time1 = Date.now() - start1;
+      const runCycles = async () => {
+        for (let i = 0; i < 100; i++) {
+          const listener = vi.fn();
+          kernel.on('test:event', listener);
+          await kernel.emit('test:event', { value: i });
+          kernel.off('test:event', listener);
+        }
+      };
 
-      // Measure time for second 100 cycles
-      const start2 = Date.now();
-      for (let i = 0; i < 100; i++) {
-        const listener = vi.fn();
-        kernel.on('test:event', listener);
-        await kernel.emit('test:event', { value: i });
-        kernel.off('test:event', listener);
-      }
-      const time2 = Date.now() - start2;
+      // Medians of repeated batches of 100 cycles, early vs late (~1 ms each on an idle machine)
+      const early = await medianDurationAsync(runCycles, { warmup: 1, samples: 5 });
+      const late = await medianDurationAsync(runCycles, { warmup: 0, samples: 5 });
 
       // Performance should be similar (no degradation)
-      // Allow 3x variance for timing inconsistencies
-      expect(time2).toBeLessThan(time1 * 3);
+      // Allow 3x variance; the 1 ms floor keeps a near-zero baseline from failing the check
+      expect(late).toBeLessThan(Math.max(early, 1) * 3);
       expect(kernel.listenerCount('test:event')).toBe(0);
     });
   });

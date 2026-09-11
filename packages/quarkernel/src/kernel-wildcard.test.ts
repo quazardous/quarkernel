@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { createKernel } from './kernel.js';
+import { medianDurationAsync } from '../tests/helpers/timing.js';
 
 interface TestEvents {
   'user:login': { userId: string };
@@ -264,12 +265,16 @@ describe('Kernel - Wildcard integration (T122)', () => {
       }
       kernel.on('user:*' as any, async () => { callCount++; });
 
-      const start = performance.now();
       await kernel.emit('user:login', { userId: '123' });
-      const duration = performance.now() - start;
-
       expect(callCount).toBe(1); // Only user:* should match
-      expect(duration).toBeLessThan(100); // Should be fast
+
+      // Distinct event names miss the plan cache, so every sample matches the 101 patterns again
+      // Regression guard: ~3 ms for the first (cold) emit on an idle machine
+      let eventIndex = 0;
+      const duration = await medianDurationAsync(() =>
+        kernel.emit(`user:login${eventIndex++}` as any, { userId: '123' })
+      );
+      expect(duration).toBeLessThan(20);
     });
   });
 });

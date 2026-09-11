@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import { medianDuration } from '../tests/helpers/timing.js';
 import {
   hasWildcard,
   matchesPattern,
@@ -183,12 +184,11 @@ describe('Wildcard - Pattern matching (T122)', () => {
       }
       patterns.push('user:*');
 
-      const start = performance.now();
-      const matches = findMatchingPatterns('user:login', patterns);
-      const duration = performance.now() - start;
+      expect(findMatchingPatterns('user:login', patterns)).toContain('user:*');
 
-      expect(matches).toContain('user:*');
-      expect(duration).toBeLessThan(100); // Should complete in < 100ms
+      // Regression guard, not a benchmark: ~5 ms per call on a warm, idle machine
+      const duration = medianDuration(() => findMatchingPatterns('user:login', patterns));
+      expect(duration).toBeLessThan(50);
     });
 
     it('should benefit from caching on repeated matches', () => {
@@ -198,14 +198,14 @@ describe('Wildcard - Pattern matching (T122)', () => {
       const patterns = ['user:*', 'post:*', 'admin:**'];
       findMatchingPatterns('user:login', patterns);
 
-      // Measure with cache
-      const start = performance.now();
-      for (let i = 0; i < 1000; i++) {
-        findMatchingPatterns('user:login', patterns);
-      }
-      const cachedDuration = performance.now() - start;
+      // Regression guard: ~1.5 ms for 1000 cached matches on a warm, idle machine
+      const cachedDuration = medianDuration(() => {
+        for (let i = 0; i < 1000; i++) {
+          findMatchingPatterns('user:login', patterns);
+        }
+      });
 
-      expect(cachedDuration).toBeLessThan(100); // Cached access should be fast
+      expect(cachedDuration).toBeLessThan(20);
     });
   });
 

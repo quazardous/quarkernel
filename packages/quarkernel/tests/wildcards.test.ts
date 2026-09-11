@@ -15,6 +15,7 @@ import {
   getCacheSize,
 } from '../src/wildcard.js';
 import { createKernel } from '../src/kernel.js';
+import { measure, median, medianDuration, medianDurationAsync } from './helpers/timing.js';
 
 describe('Wildcard - Pattern Matching (T128)', () => {
   beforeEach(() => {
@@ -310,18 +311,15 @@ describe('Wildcard - Pattern Matching (T128)', () => {
         patterns.push(`entity${i % 10}:*`); // Some duplicates to test cache
       }
 
-      const startTime = performance.now();
-
       // Match against an event - should use cached patterns
-      for (let i = 0; i < 100; i++) {
-        findMatchingPatterns('entity5:created', patterns);
-      }
+      // Regression guard: ~3.5 ms for 10 calls over 1000 patterns on a warm, idle machine
+      const duration = medianDuration(() => {
+        for (let i = 0; i < 10; i++) {
+          findMatchingPatterns('entity5:created', patterns);
+        }
+      });
 
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      // Should complete in reasonable time (< 100ms for 100 iterations over 1000 patterns)
-      expect(duration).toBeLessThan(100);
+      expect(duration).toBeLessThan(35);
 
       // Cache should only contain unique patterns (max 100 due to LRU)
       expect(getCacheSize()).toBeLessThanOrEqual(100);
@@ -332,26 +330,29 @@ describe('Wildcard - Pattern Matching (T128)', () => {
       const pattern = 'user:*';
       const eventName = 'user:created';
 
-      // First run - cache miss
-      const startMiss = performance.now();
-      for (let i = 0; i < 1000; i++) {
-        clearPatternCache(); // Force cache miss
-        matchesPattern(eventName, pattern);
-      }
-      const missDuration = performance.now() - startMiss;
+      const missDurations: number[] = [];
+      const hitDurations: number[] = [];
 
-      // Second run - cache hit
-      clearPatternCache();
-      getPatternRegex(pattern); // Pre-warm cache
-      const startHit = performance.now();
-      for (let i = 0; i < 1000; i++) {
-        matchesPattern(eventName, pattern);
-      }
-      const hitDuration = performance.now() - startHit;
+      // Interleave samples so a load spike affects both sides alike
+      for (let sample = 0; sample < 9; sample++) {
+        missDurations.push(measure(() => {
+          for (let i = 0; i < 1000; i++) {
+            clearPatternCache(); // Force cache miss
+            matchesPattern(eventName, pattern);
+          }
+        }));
 
-      // Cache hits should be significantly faster
-      // Allow for timing variance, but expect at least 2x improvement
-      expect(hitDuration).toBeLessThan(missDuration / 2);
+        clearPatternCache();
+        getPatternRegex(pattern); // Pre-warm cache
+        hitDurations.push(measure(() => {
+          for (let i = 0; i < 1000; i++) {
+            matchesPattern(eventName, pattern);
+          }
+        }));
+      }
+
+      // Cache hits are ~9x faster on an idle machine: expect at least 2x on the medians
+      expect(median(hitDurations)).toBeLessThan(median(missDurations) / 2);
     });
   });
 });
@@ -505,12 +506,11 @@ describe('Kernel - Wildcard Integration (T128)', () => {
       });
     }
 
-    const startTime = performance.now();
     await kernel.emit('user:created', { id: 1, name: 'Alice' });
-    const duration = performance.now() - startTime;
-
     expect(callCount).toBe(100);
-    // Should complete in reasonable time (< 50ms)
-    expect(duration).toBeLessThan(50);
+
+    // Regression guard: ~0.3 ms per emit on a warm, idle machine
+    const duration = await medianDurationAsync(() => kernel.emit('user:created', { id: 1, name: 'Alice' }));
+    expect(duration).toBeLessThan(10);
   });
 });
