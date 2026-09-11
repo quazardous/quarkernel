@@ -5,6 +5,29 @@ All notable changes to QuarKernel will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.4.0] - 2026-09-11
+
+### Added
+- **`kernel.when(eventNames, options?)`**: react to a combination of events on one kernel without building `[kernel, event]` tuples
+  - Returns a `Composition` bound to the kernel (`onComposed()`, `once()`, `dispose()`)
+  - `Composition` stays the API for combining events from several kernels
+- **Per-emit errors**: `emit()` and `emitSerial()` now resolve with the errors thrown by that emit's listeners (`ExecutionError[]`, empty when none failed), and the same list is available as `event.errors` to listeners and `onError`
+  - `ExecutionError` is now exported as a type
+
+### Changed
+- **README**: leads with event orchestration; state machines are presented as the optional `/fsm` entry
+  - New Semantics section (execution order, context lifetime, errors, concurrency), plus Cleanup, Promises and Requirements sections
+  - Links to the changelog and contributing guide (rewritten to absolute URLs in the npm README)
+- **Docs**: composition examples use `qk.when()`; fixed the advanced guide example that read the merged context from `e.context` instead of `e.data.merged`, and removed calls to a non-existent `Composition.reset()` (compositions re-arm automatically; `clearBuffers()` discards pending events)
+
+### Fixed
+- **`getExecutionErrors()` with overlapping emits**: an emit starting while another one was still running wiped the errors already collected by the first one
+  - The list is now reset only when an emit starts on an idle kernel, so overlapping and nested emits add to it
+  - Prefer the errors returned by `emit()` for exact per-emit results
+- **Composition context capture**: compositions (`qk.when()`, `new Composition()`) now capture a source event's context once every listener of that emit has completed
+  - Values written by async listeners after an `await`, or by dependency chains, were missing from `contexts` and `merged`
+  - A `stopPropagation()` from any listener of the source emit now also skips the composition for that emit
+
 ## [2.3.3] - 2026-09-11
 
 ### Fixed

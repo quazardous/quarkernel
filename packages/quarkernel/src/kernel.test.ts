@@ -194,7 +194,7 @@ describe('Kernel - Basic on/off/emit (T115)', () => {
 
       await expect(
         kernel.emit('test:simple', { value: 1 })
-      ).resolves.toBeUndefined();
+      ).resolves.toEqual([]);
     });
 
     it('should provide shared context object', async () => {

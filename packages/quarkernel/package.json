@@ -1,6 +1,6 @@
 {
   "name": "@quazardous/quarkernel",
-  "version": "2.3.3",
+  "version": "2.4.0",
   "type": "module",
   "description": "Micro Custom Events Kernel with dependency ordering, shared context, and composite events",
   "author": "quazardous <berliozdavid@gmail.com>",
@@ -64,7 +64,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "prebuild": "cp ../../README.md ./README.md && sed -i 's|(\\./docs/|(https://github.com/quazardous/quarkernel/blob/main/docs/|g; s|(\\./packages/|(https://github.com/quazardous/quarkernel/blob/main/packages/|g; s|(\\./benchmarks/|(https://github.com/quazardous/quarkernel/blob/main/benchmarks/|g; s|(\\./demos/|(https://github.com/quazardous/quarkernel/blob/main/demos/|g; s|(\\./LICENSE)|(https://github.com/quazardous/quarkernel/blob/main/LICENSE)|g' ./README.md",
+    "prebuild": "cp ../../README.md ./README.md && sed -i 's|(\\./docs/|(https://github.com/quazardous/quarkernel/blob/main/docs/|g; s|(\\./packages/|(https://github.com/quazardous/quarkernel/blob/main/packages/|g; s|(\\./benchmarks/|(https://github.com/quazardous/quarkernel/blob/main/benchmarks/|g; s|(\\./demos/|(https://github.com/quazardous/quarkernel/blob/main/demos/|g; s|(\\./LICENSE)|(https://github.com/quazardous/quarkernel/blob/main/LICENSE)|g; s|(\\./CHANGELOG\\.md)|(https://github.com/quazardous/quarkernel/blob/main/CHANGELOG.md)|g; s|(\\./CONTRIBUTING\\.md)|(https://github.com/quazardous/quarkernel/blob/main/CONTRIBUTING.md)|g' ./README.md",
     "build": "tsup",
     "build:watch": "tsup --watch",
     "typecheck": "tsc --noEmit",

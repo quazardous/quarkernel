@@ -14,7 +14,7 @@ import type {
   CompositionOptions,
   ConflictInfo,
 } from './types.js';
-import type { IKernelEvent } from '../types.js';
+import type { IKernelEvent, ExecutionError } from '../types.js';
 import type {
   EventMap,
   ListenerFunction,
@@ -130,14 +130,15 @@ export class Composition<Events extends EventMap = EventMap> {
     // Initialize buffer for this event
     this.buffers.set(eventName, []);
 
-    // Subscribe to the kernel's events with lowest priority
-    // This ensures we capture the event AFTER all other listeners have modified the context
+    // Subscribe in the final phase: the kernel runs this listener after every
+    // other listener of the emit has completed (async work and dependency
+    // chains included), so the captured context is the settled one
     const unbind = kernel.on(
       eventName,
       async (event) => {
         await this.handleSourceEvent(eventName, event);
       },
-      { priority: -Infinity }
+      { phase: 'final' }
     );
 
     this.subscriptions.push({
@@ -400,7 +401,7 @@ export class Composition<Events extends EventMap = EventMap> {
   async emit<K extends keyof Events>(
     eventName: K,
     data?: Events[K]
-  ): Promise<void> {
+  ): Promise<ReadonlyArray<ExecutionError>> {
     if (String(eventName).startsWith('__qk:')) {
       throw new Error(`Cannot emit reserved event: ${String(eventName)}`);
     }

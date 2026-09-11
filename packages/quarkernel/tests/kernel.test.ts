@@ -287,7 +287,7 @@ describe('Kernel - Core Methods (T126)', () => {
 
       await expect(
         kernel.emit('test:simple', { value: 1 })
-      ).resolves.toBeUndefined();
+      ).resolves.toEqual([]);
     });
 
     it('should handle emitting multiple events in sequence', async () => {

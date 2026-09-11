@@ -129,20 +129,16 @@ qk.on('*:transition', (e) => {
 Wait for multiple events:
 
 ```typescript
-import { Kernel, Composition } from '@quazardous/quarkernel';
+import { Kernel } from '@quazardous/quarkernel';
 
 const qk = new Kernel();
 
 // Fire when ALL events have occurred (any order)
-const appReady = new Composition([
-  [qk, 'auth:complete'],
-  [qk, 'data:loaded'],
-  [qk, 'ui:rendered'],
-]);
+const appReady = qk.when(['auth:complete', 'data:loaded', 'ui:rendered']);
 
 appReady.onComposed((e) => {
   // Merged context from all events
-  console.log('App ready!', e.context);
+  console.log('App ready!', e.data.merged);
 });
 
 // Events can occur in any order
@@ -189,14 +185,11 @@ const shipping = useMachine(qk, {
 });
 
 // Start fulfillment when order confirmed AND payment received
-const fulfillmentReady = new Composition([
-  [qk, 'order:enter:confirmed'],
-  [qk, 'payment:enter:paid'],
-]);
+const fulfillmentReady = qk.when(['order:enter:confirmed', 'payment:enter:paid']);
 
+// Fires again for the next order once both events have fired again
 fulfillmentReady.onComposed(() => {
   shipping.send('PREPARE');
-  fulfillmentReady.reset();  // Ready for next order
 });
 
 qk.on('shipping:enter:ready', () => shipping.send('DISPATCH'));
@@ -242,15 +235,14 @@ const payment = useMachine(qk, {
 });
 
 // Saga success: all three must complete
-const sagaComplete = new Composition([
-  [qk, 'order:enter:confirmed'],
-  [qk, 'inventory:enter:reserved'],
-  [qk, 'payment:enter:charged'],
+const sagaComplete = qk.when([
+  'order:enter:confirmed',
+  'inventory:enter:reserved',
+  'payment:enter:charged',
 ]);
 
 sagaComplete.onComposed(() => {
   inventory.send('COMMIT');
-  sagaComplete.reset();
 });
 
 // Rollback on payment failure
@@ -307,10 +299,7 @@ const player = useMachine(qk, {
 });
 
 // Show dashboard when app ready AND logged in
-const showDashboard = new Composition([
-  [qk, 'app:enter:ready'],
-  [qk, 'auth:enter:loggedIn'],
-]);
+const showDashboard = qk.when(['app:enter:ready', 'auth:enter:loggedIn']);
 showDashboard.onComposed(() => dashboard.send('SHOW'));
 
 // Sync: hide dashboard & stop player on logout or error
@@ -399,11 +388,11 @@ let step = 0;
 });
 
 // Timeout: events within time window
-const timed = new Composition([[qk, 'auth:start'], [qk, 'auth:done']]);
+const timed = qk.when(['auth:start', 'auth:done']);
 let timeout;
 qk.on('auth:start', () => {
   timeout = setTimeout(() => {
-    timed.reset();
+    timed.clearBuffers(); // forget the pending auth:start
     qk.emit('auth:timeout');
   }, 30000);
 });
@@ -417,10 +406,10 @@ Promise.race([
 ]).then((e) => console.log('First:', e.name));
 
 // Repeating: fire on each cycle
-const cycle = new Composition([[qk, 'tick:a'], [qk, 'tick:b']]);
+// Fires again each time both events have fired again
+const cycle = qk.when(['tick:a', 'tick:b']);
 cycle.onComposed(() => {
   console.log('Cycle complete');
-  cycle.reset();
 });
 
 // Debounced: wait for settle

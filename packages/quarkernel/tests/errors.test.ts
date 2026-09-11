@@ -45,7 +45,7 @@ describe('Kernel - Error Handling (T129)', () => {
       // Should not throw despite listener2 failing
       await expect(
         kernel.emit('test:simple', { value: 1 })
-      ).resolves.toBeUndefined();
+      ).resolves.toHaveLength(1);
 
       // All listeners should have been called
       expect(listener1).toHaveBeenCalledTimes(1);

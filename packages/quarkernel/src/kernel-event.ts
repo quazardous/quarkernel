@@ -7,6 +7,8 @@
  * - Simpler API without DOM baggage
  */
 
+import type { ExecutionError } from './types.js';
+
 /**
  * Event propagation control for listener execution
  */
@@ -37,6 +39,12 @@ export class KernelEvent<T = unknown> {
    */
   private _propagationStopped = false;
 
+  /**
+   * Internal list of errors thrown by listeners of this emit
+   * @private
+   */
+  private readonly _errors: ExecutionError[] = [];
+
   constructor(name: string, data: T, context: Record<string, any> = {}) {
     this.name = name;
     this.data = data;
@@ -61,4 +69,20 @@ export class KernelEvent<T = unknown> {
   get isPropagationStopped(): boolean {
     return this._propagationStopped;
   }
+
+  /**
+   * Errors thrown by listeners of this emit so far
+   * Also returned by emit() / emitSerial() once the emit completes
+   */
+  get errors(): ReadonlyArray<ExecutionError> {
+    return this._errors;
+  }
+
+  /**
+   * Record a listener error for this emit
+   * @internal
+   */
+  recordError = (error: ExecutionError): void => {
+    this._errors.push(error);
+  };
 }

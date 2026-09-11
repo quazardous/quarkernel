@@ -63,6 +63,23 @@ export interface IKernelEvent<T = any> {
 
   /** Whether propagation was stopped */
   readonly isPropagationStopped: boolean;
+
+  /** Errors thrown by listeners of this emit so far (set on events emitted by a kernel) */
+  readonly errors?: ReadonlyArray<ExecutionError>;
+}
+
+/**
+ * Error thrown by a listener during an emit
+ */
+export interface ExecutionError {
+  /** Id of the listener that threw */
+  listenerId: string;
+  /** The thrown error */
+  error: Error;
+  /** When the error was caught (milliseconds since epoch) */
+  timestamp: number;
+  /** Name of the emitted event */
+  eventName: string;
 }
 
 // ============================================================================
@@ -80,7 +97,7 @@ export interface IListenerContext {
   off(): void;
 
   /** Emit another event */
-  emit<K extends string = string>(event: K, data?: any): Promise<void>;
+  emit<K extends string = string>(event: K, data?: any): Promise<ReadonlyArray<ExecutionError>>;
 
   /** Stop propagation to remaining listeners */
   stopPropagation(): void;
@@ -146,6 +163,17 @@ export interface ListenerOptions {
 
   /** AbortSignal for cleanup */
   signal?: AbortSignal;
+
+  /**
+   * Execution phase
+   *
+   * `'final'` runs the listener after every other listener of the emit has
+   * completed, async work and dependency chains included. Final listeners
+   * cannot be targeted by `after`, and their own `after` is ignored.
+   *
+   * @internal Used by Composition to capture the settled event context
+   */
+  phase?: 'final';
 }
 
 /**
@@ -176,6 +204,9 @@ export interface ListenerEntry {
 
   /** Abort event listener reference for cleanup */
   abortListener?: () => void;
+
+  /** Execution phase ('final' runs after every other listener of the emit) */
+  phase?: 'final';
 }
 
 // ============================================================================
@@ -324,15 +355,17 @@ export interface IKernel<Events extends EventMap = EventMap> {
   offAll(event?: keyof Events): void;
 
   // Emit methods
+  // A Kernel resolves with the errors thrown by the emit's listeners; other
+  // implementations (e.g. the worker bridge) may resolve with nothing
   emit<K extends keyof Events>(
     event: K,
     data?: Events[K]
-  ): Promise<void>;
+  ): Promise<ReadonlyArray<ExecutionError> | void>;
 
   emitSerial<K extends keyof Events>(
     event: K,
     data?: Events[K]
-  ): Promise<void>;
+  ): Promise<ReadonlyArray<ExecutionError> | void>;
 
   // Composition
   compose(

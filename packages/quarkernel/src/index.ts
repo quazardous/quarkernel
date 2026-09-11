@@ -10,7 +10,7 @@
  * - Zero runtime dependencies
  */
 
-export const VERSION = '2.2.0';
+export const VERSION = '2.4.0';
 
 // Core exports
 export { KernelEvent } from './kernel-event.js';
@@ -34,6 +34,7 @@ export type {
   ListenerOptions,
   ListenerEntry,
   KernelOptions,
+  ExecutionError,
   EventStack,
   CompositionFactory,
   IComposition,

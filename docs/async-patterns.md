@@ -10,30 +10,29 @@ FSM      →  Track state
 
 ## Promise API Reference
 
-### QK: `emit()` → `Promise<void>`
+### QK: `emit()` → `Promise<ReadonlyArray<ExecutionError>>`
 
 Resolves when **all listeners complete** (parallel by default; listeners with `after` wait for their dependencies to complete).
 
 ```typescript
 await qk.emit('event', data);
 
-// .then() receives: void (nothing)
-qk.emit('event', data).then(() => console.log('all listeners done'));
+// .then() receives: the errors thrown by this emit's listeners ([] when none failed)
+qk.emit('event', data).then((errors) => console.log('all listeners done,', errors.length, 'failed'));
 ```
 
 **Error handling:**
 
 ```typescript
-// errorBoundary: true (default) - never throws
-await qk.emit('event');
-const errors = qk.getExecutionErrors();
+// errorBoundary: true (default) - never throws, resolves with this emit's errors
+const errors = await qk.emit('event');
 
 // errorBoundary: false - throws AggregateError
 try { await qk.emit('event'); }
 catch (e) { console.log(e.errors); }
 ```
 
-### QK: `emitSerial()` → `Promise<void>`
+### QK: `emitSerial()` → `Promise<ReadonlyArray<ExecutionError>>`
 
 Same as `emit()`, sequential execution.
 
@@ -55,10 +54,7 @@ const unbind = qk.on('user:loaded', (e) => console.log(e.data), { once: true });
 ### Composition: `once()` → `Promise<IKernelEvent>`
 
 ```typescript
-const composition = new Composition([
-  [qk, 'user:ready'],
-  [qk, 'config:ready'],
-]);
+const composition = qk.when(['user:ready', 'config:ready']);
 
 // .then() receives: IKernelEvent with data: { sources, contexts, merged }
 const event = await composition.once();
@@ -67,6 +63,9 @@ console.log(event.data.sources); // ['user:ready', 'config:ready']
 
 // With timeout
 const event = await composition.once({ timeout: 5000 });
+
+// The composition stays subscribed to qk until disposed
+composition.dispose();
 ```
 
 ### FSM: `send()` → `Promise<boolean>`
@@ -211,10 +210,7 @@ await order.waitFor('paid');
 ### 7. Composition
 
 ```typescript
-const appReady = new Composition([
-  [qk, 'user:ready'],
-  [qk, 'config:ready'],
-]);
+const appReady = qk.when(['user:ready', 'config:ready']);
 
 // Callback style
 appReady.onComposed((e) => initApp(e.data.merged));
@@ -222,7 +218,12 @@ appReady.onComposed((e) => initApp(e.data.merged));
 // Promise style
 const { data } = await appReady.once();
 initApp(data.merged);
+
+// Stop listening once it is no longer needed
+appReady.dispose();
 ```
+
+Use `new Composition([[kernelA, 'a'], [kernelB, 'b']])` to combine events from several kernels.
 
 ### 8. Error Collection
 
@@ -230,8 +231,8 @@ initApp(data.merged);
 qk.on('batch', async () => { await mayFail1(); });
 qk.on('batch', async () => { await mayFail2(); });
 
-await qk.emit('batch'); // all run, never throws
-qk.getExecutionErrors().forEach(e => console.log(e.error));
+const errors = await qk.emit('batch'); // all run, never throws
+errors.forEach(e => console.log(e.listenerId, e.error));
 ```
 
 ---
@@ -240,7 +241,7 @@ qk.getExecutionErrors().forEach(e => console.log(e.error));
 
 | Method | `.then()` receives |
 |--------|-------------------|
-| `qk.emit()` | `void` |
+| `qk.emit()` | `ExecutionError[]` (errors of that emit) |
 | `qk.once()` | `IKernelEvent { name, data, context }` |
 | `qk.on(..., { once: true })` | N/A (returns unbind) |
 | `composition.once()` | `IKernelEvent { data: { sources, merged } }` |
@@ -249,5 +250,5 @@ qk.getExecutionErrors().forEach(e => console.log(e.error));
 
 | Layer | Error Handling |
 |-------|----------------|
-| **QK** | `errorBoundary` + `getExecutionErrors()` |
+| **QK** | `errorBoundary` + errors returned by `emit()` |
 | **FSM** | try/catch in actions → transition to error state |

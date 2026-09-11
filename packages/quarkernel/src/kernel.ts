@@ -20,17 +20,8 @@ import type {
   ListenerOptions,
   ListenerEntry,
   KernelOptions,
+  ExecutionError,
 } from './types.js';
-
-/**
- * Error collected during event execution
- */
-interface ExecutionError {
-  listenerId: string;
-  error: Error;
-  timestamp: number;
-  eventName: string;
-}
 
 /**
  * Listeners matching an event, ready to execute
@@ -57,6 +48,8 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
   private options: Required<KernelOptions>;
   private listenerIdCounter = 0;
   private executionErrors: ExecutionError[] = [];
+  // Emits currently running; executionErrors is only reset when this is 0
+  private emitsInFlight = 0;
   // Cleared on every listener change (on, off, offAll)
   private planCache = new Map<string, ExecutionPlan>();
 
@@ -129,6 +122,7 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
       original: listener as ListenerFunction,
       signal: options.signal,
       abortListener,
+      phase: options.phase,
     };
 
     // Get or create listener array for this event
@@ -213,6 +207,40 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
   }
 
   /**
+   * React to a combination of events on this kernel
+   *
+   * Shorthand for `new Composition([[kernel, event1], [kernel, event2], ...], options)`.
+   * Use `Composition` directly to combine events from several kernels.
+   * The composition stays subscribed until `dispose()` is called.
+   *
+   * @param eventNames - Events that must all fire before the composite event
+   * @param options - Composition options (merger, bufferLimit, reset, TTLs...)
+   * @returns Composition bound to this kernel
+   *
+   * @example
+   * ```typescript
+   * const checkout = qk.when(['cart:ready', 'payment:confirmed']);
+   * checkout.onComposed((e) => ship(e.data.merged));
+   *
+   * // Promise form
+   * const ready = qk.when(['cart:ready', 'payment:confirmed']);
+   * const event = await ready.once({ timeout: 5000 });
+   * ready.dispose();
+   * ```
+   */
+  when(eventNames: Array<keyof Events>, options?: CompositionOptions): Composition {
+    if (eventNames.length === 0) {
+      throw new Error('when() requires at least one event name');
+    }
+
+    const kernel = this as unknown as Kernel;
+    return new Composition(
+      eventNames.map((eventName): [Kernel, EventName] => [kernel, String(eventName)]),
+      options
+    );
+  }
+
+  /**
    * Remove an event listener
    * If no listener provided, removes all listeners for the event
    */
@@ -271,13 +299,13 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
    * Emit an event
    * Executes listeners level by level: listeners in the same dependency level
    * run in parallel, and each level completes before the next one starts
-   * Returns a Promise that resolves when all listeners complete
-   * Throws AggregateError if any listeners failed
+   * Resolves with the errors thrown by this emit's listeners when all listeners complete
+   * Throws AggregateError if any listeners failed and errorBoundary is false
    */
   async emit<K extends keyof Events>(
     eventName: K,
     data?: Events[K]
-  ): Promise<void> {
+  ): Promise<ReadonlyArray<ExecutionError>> {
     const event = String(eventName);
 
     // Matching listeners (exact match + wildcards) grouped by dependency level
@@ -287,7 +315,7 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
       if (this.options.debug) {
         console.debug('[QuarKernel] Event emitted (no listeners)', { event });
       }
-      return;
+      return [];
     }
 
     if (this.options.debug) {
@@ -298,44 +326,48 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
       });
     }
 
-    // Clear execution errors from previous emit
-    this.executionErrors = [];
-
     const kernelEvent = new KernelEvent<Events[K]>(
       event,
       data as Events[K],
       {}
     );
 
-    // Execute each level in parallel using Promise.allSettled so one failure
-    // doesn't block others, and await it before starting the next level so
-    // dependents see what their async dependencies wrote to the context
-    const results: PromiseSettledResult<void>[] = [];
-    for (const level of levels) {
-      const levelResults = await Promise.allSettled(
-        level.map((entry) => this.executeListener(entry, kernelEvent, event))
-      );
-      results.push(...levelResults);
-    }
-
-    // Remove once listeners after execution
-    this.removeOnceListeners(event, sortedEntries, kernelEvent);
-
-    // Collect errors from rejected promises (only if errorBoundary is false)
-    if (!this.options.errorBoundary) {
-      const errors = results
-        .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-        .map((result) => result.reason);
-
-      if (errors.length > 0) {
-        throw new AggregateError(errors, `${errors.length} listener(s) failed for event "${event}"`);
+    this.beginEmit();
+    try {
+      // Execute each level in parallel using Promise.allSettled so one failure
+      // doesn't block others, and await it before starting the next level so
+      // dependents see what their async dependencies wrote to the context
+      const results: PromiseSettledResult<void>[] = [];
+      for (const level of levels) {
+        const levelResults = await Promise.allSettled(
+          level.map((entry) => this.executeListener(entry, kernelEvent, event))
+        );
+        results.push(...levelResults);
       }
-    }
 
-    if (this.options.debug) {
-      console.debug('[QuarKernel] Event completed', {
-        event,
-      });
+      // Remove once listeners after execution
+      this.removeOnceListeners(event, sortedEntries, kernelEvent);
+
+      // Collect errors from rejected promises (only if errorBoundary is false)
+      if (!this.options.errorBoundary) {
+        const errors = results
+          .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+          .map((result) => result.reason);
+
+        if (errors.length > 0) {
+          throw new AggregateError(errors, `${errors.length} listener(s) failed for event "${event}"`);
+        }
+      }
+
+      if (this.options.debug) {
+        console.debug('[QuarKernel] Event completed', {
+          event,
+        });
+      }
+
+      return kernelEvent.errors;
+    } finally {
+      this.emitsInFlight--;
     }
   }
 
@@ -348,7 +380,7 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
   async emitSerial<K extends keyof Events>(
     eventName: K,
     data?: Events[K]
-  ): Promise<void> {
+  ): Promise<ReadonlyArray<ExecutionError>> {
     const event = String(eventName);
 
     // Matching listeners (exact match + wildcards) in dependency level, then priority order
@@ -358,7 +390,7 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
       if (this.options.debug) {
         console.debug('[QuarKernel] Event emitted serially (no listeners)', { event });
       }
-      return;
+      return [];
     }
 
     if (this.options.debug) {
@@ -369,45 +401,61 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
       });
     }
 
-    // Clear execution errors from previous emit
-    this.executionErrors = [];
-
     const kernelEvent = new KernelEvent<Events[K]>(
       event,
       data as Events[K],
       {}
     );
 
-    // Execute listeners sequentially
-    const errors: Error[] = [];
-    for (const entry of sortedEntries) {
-      try {
-        await this.executeListener(entry, kernelEvent, event);
-      } catch (error) {
-        if (!this.options.errorBoundary) {
-          // Stop on first error if error boundary is disabled
-          // Clean up once listeners before throwing
-          this.removeOnceListeners(event, sortedEntries, kernelEvent);
-          throw error;
+    this.beginEmit();
+    try {
+      // Execute listeners sequentially
+      const errors: Error[] = [];
+      for (const entry of sortedEntries) {
+        try {
+          await this.executeListener(entry, kernelEvent, event);
+        } catch (error) {
+          if (!this.options.errorBoundary) {
+            // Stop on first error if error boundary is disabled
+            // Clean up once listeners before throwing
+            this.removeOnceListeners(event, sortedEntries, kernelEvent);
+            throw error;
+          }
+          // errorBoundary is true, collect error and continue
+          errors.push(error as Error);
         }
-        // errorBoundary is true, collect error and continue
-        errors.push(error as Error);
       }
-    }
 
-    // Remove once listeners after execution
-    this.removeOnceListeners(event, sortedEntries, kernelEvent);
+      // Remove once listeners after execution
+      this.removeOnceListeners(event, sortedEntries, kernelEvent);
 
-    // If errorBoundary is false and we have errors, throw AggregateError
-    if (!this.options.errorBoundary && errors.length > 0) {
-      throw new AggregateError(errors, `${errors.length} listener(s) failed for event "${event}"`);
-    }
+      // If errorBoundary is false and we have errors, throw AggregateError
+      if (!this.options.errorBoundary && errors.length > 0) {
+        throw new AggregateError(errors, `${errors.length} listener(s) failed for event "${event}"`);
+      }
 
-    if (this.options.debug) {
-      console.debug('[QuarKernel] Event completed serially', {
-        event,
-      });
+      if (this.options.debug) {
+        console.debug('[QuarKernel] Event completed serially', {
+          event,
+        });
+      }
+
+      return kernelEvent.errors;
+    } finally {
+      this.emitsInFlight--;
     }
+  }
+
+  /**
+   * Mark the start of an emit
+   * getExecutionErrors() is only reset when no other emit is running, so
+   * overlapping and nested emits don't wipe each other's errors
+   */
+  private beginEmit(): void {
+    if (this.emitsInFlight === 0) {
+      this.executionErrors = [];
+    }
+    this.emitsInFlight++;
   }
 
   /**
@@ -422,7 +470,8 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
 
   /**
    * Resolve the execution plan for an event: listeners registered under the
-   * event name or a matching wildcard pattern, grouped by dependency level
+   * event name or a matching wildcard pattern, grouped by dependency level,
+   * with final-phase listeners as a last level
    * Plans are cached per event name; any listener change clears the cache
    * Throws on missing or cyclic dependencies (failed plans are not cached)
    */
@@ -444,7 +493,14 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
       }
     }
 
-    const levels = allEntries.length > 0 ? this.groupListenersByDependencyLevel(allEntries) : [];
+    // Final-phase listeners stay out of the dependency graph and run last
+    const regularEntries = allEntries.filter((entry) => entry.phase !== 'final');
+    const finalEntries = allEntries.filter((entry) => entry.phase === 'final');
+
+    const levels = regularEntries.length > 0 ? this.groupListenersByDependencyLevel(regularEntries) : [];
+    if (finalEntries.length > 0) {
+      levels.push(finalEntries.sort((a, b) => b.priority - a.priority));
+    }
     const plan: ExecutionPlan = { levels, entries: levels.flat() };
 
     if (this.planCache.size >= PLAN_CACHE_LIMIT) {
@@ -579,7 +635,8 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
         eventName,
       };
 
-      // Collect error for reporting
+      // Collect error for this emit and for getExecutionErrors()
+      event.recordError(executionError);
       this.executionErrors.push(executionError);
 
       if (this.options.debug) {
@@ -730,8 +787,9 @@ export class Kernel<Events extends EventMap = EventMap> implements ListenerConte
   }
 
   /**
-   * Get collected execution errors from the last emit
-   * Useful for error aggregation and reporting
+   * Get execution errors collected since the kernel was last idle
+   * Legacy: prefer the errors returned by emit() / emitSerial(), which only
+   * contain the errors of that emit even when emits overlap
    */
   getExecutionErrors(): ReadonlyArray<ExecutionError> {
     return this.executionErrors;

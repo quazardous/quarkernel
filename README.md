@@ -4,9 +4,9 @@
 [![bundle size](https://img.shields.io/bundlephobia/minzip/@quazardous/quarkernel?style=flat-square)](https://bundlephobia.com/package/@quazardous/quarkernel)
 [![license](https://img.shields.io/npm/l/@quazardous/quarkernel.svg?style=flat-square)](https://github.com/quazardous/quarkernel/blob/main/LICENSE)
 
-**Event orchestration with dependency ordering, shared context, and state machines.**
+**Event orchestration: dependency ordering, shared context and composite events.**
 
-TypeScript-first. Zero dependencies. ~4.6 kB gzipped for the kernel, state machines in a separate entry ([sizes](#size)).
+TypeScript-first. Zero dependencies. ~4.8 kB gzipped for the kernel, state machines in a separate entry ([sizes](#size)).
 
 [![Try QK Studio](https://img.shields.io/badge/Try_it_live-QK_Studio-blue?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlnb24gcG9pbnRzPSI1IDMgMTkgMTIgNSAyMSA1IDMiPjwvcG9seWdvbj48L3N2Zz4=)](https://quazardous.github.io/quarkernel/qk-studio/)
 [![Try FSM Studio](https://img.shields.io/badge/Try_it_live-FSM_Studio-purple?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiPjxjaXJjbGUgY3g9IjYiIGN5PSIxMiIgcj0iMyIvPjxjaXJjbGUgY3g9IjE4IiBjeT0iMTIiIHI9IjMiLz48bGluZSB4MT0iOSIgeTE9IjEyIiB4Mj0iMTUiIHkyPSIxMiIvPjwvc3ZnPg==)](https://quazardous.github.io/quarkernel/fsm-studio/)
@@ -42,9 +42,9 @@ mitt and eventemitter3 are simple synchronous event buses, and much smaller. emi
 | Composite events | - | - | - | **Yes** |
 | State machines | - | - | - | **Yes** (`/fsm`) |
 | TypeScript types | Yes | Yes | Yes | **Yes** |
-| Size (min + gzip) | 0.2 kB | 1.3 kB | 2.2 kB | **4.6 kB** (`createKernel`) |
+| Size (min + gzip) | 0.2 kB | 1.3 kB | 2.2 kB | **4.8 kB** (`createKernel`) |
 
-<sub>Sizes measured with esbuild (minified ESM) + gzip: mitt 3.0.1, eventemitter3 5.0.4, emittery 1.2.0, QuarKernel 2.3.3.</sub>
+<sub>Sizes measured with esbuild (minified ESM) + gzip: mitt 3.0.1, eventemitter3 5.0.4, emittery 1.2.0, QuarKernel 2.4.0.</sub>
 
 ---
 
@@ -59,15 +59,22 @@ npm install @quazardous/quarkernel
 <script src="https://unpkg.com/@quazardous/quarkernel@2/dist/index.umd.js"></script>
 ```
 
+### Requirements
+
+- Node.js 18+, or any modern browser (the code uses ES2022 syntax)
+- ES modules (`import`), CommonJS (`require`), and a `QuarKernel` global from the UMD build for `<script>` tags
+- TypeScript types included
+- Release notes in the [CHANGELOG](./CHANGELOG.md)
+
 ### Size
 
-Minified + gzipped, measured with esbuild on 2.3.3. The publish workflow enforces a budget per entry point (`npm run size --workspace=packages/quarkernel`).
+Minified + gzipped, measured with esbuild on 2.4.0. The publish workflow enforces a budget per entry point (`npm run size --workspace=packages/quarkernel`).
 
 | Import | min + gzip |
 |--------|-----------:|
-| `@quazardous/quarkernel`, `createKernel` only | 4.6 kB |
-| `@quazardous/quarkernel`, whole entry | 7.4 kB |
-| `@quazardous/quarkernel/fsm` | 5.9 kB (includes the kernel, shared with the core entry) |
+| `@quazardous/quarkernel`, `createKernel` only | 4.8 kB |
+| `@quazardous/quarkernel`, whole entry | 7.6 kB |
+| `@quazardous/quarkernel/fsm` | 6.1 kB (includes the kernel, shared with the core entry) |
 | `@quazardous/quarkernel/xstate` | 1.1 kB |
 
 The ES module entries share a single copy of the kernel, so importing both the core and `/fsm` adds nothing on top of `/fsm`. The CommonJS builds (`require`) are self-contained: requiring both loads the kernel twice.
@@ -98,16 +105,14 @@ await qk.emit('checkout', { items: ['sku-123'], card: 'tok_visa' });
 
 ```typescript
 // 2. Composite events - react to event combinations
-import { Composition } from '@quazardous/quarkernel';
-
-const checkout = new Composition([
-  [qk, 'cart:ready'],
-  [qk, 'payment:confirmed']
-]);
+const checkout = qk.when(['cart:ready', 'payment:confirmed']);
 
 checkout.onComposed(() => {
   console.log('Both events fired - proceed to shipping!');
 });
+
+// Promise form: await checkout.once(), then checkout.dispose() when done
+// Across several kernels: new Composition([[kernelA, 'a'], [kernelB, 'b']])
 ```
 
 ```typescript
@@ -118,9 +123,79 @@ qk.on('user:*', (e) => console.log('User action:', e.name));
 
 ---
 
-## State Machines (FSM)
+## Semantics
 
-Built-in finite state machine support with XState-compatible format:
+**Execution order.** `emit()` runs listeners level by level. Listeners without `after` form the first level; any other listener runs in the level right after its deepest dependency. Listeners of the same level run in parallel and start in `priority` order (highest first). Each level waits until the previous one has finished, including async work. `emitSerial()` follows the same order, one listener at a time.
+
+**Context.** Every emit creates a fresh `event.context` object. All listeners of that emit share it by reference (it is not cloned), and no other emit sees it, so concurrent emits of the same event never mix their context.
+
+**Errors.** By default (`errorBoundary: true`), a failing listener is reported to `onError` (`console.error` unless you pass your own) and the other listeners keep running, including the ones that depend on it; `emit()` resolves with the errors of that emit (also available to listeners as `event.errors`). With `errorBoundary: false`, `emit()` still runs every listener and then rejects with an `AggregateError`, while `emitSerial()` stops at the first failure and rejects with that error. Anything a listener wrote to `context` before throwing stays visible to later listeners. A missing or cyclic `after` dependency always rejects the emit.
+
+```typescript
+const qk = createKernel({
+  errorBoundary: true, // default
+  onError: (error, event) => report(error, event.name),
+});
+
+const errors = await qk.emit('import:run', file); // [] when every listener succeeded
+errors.forEach(({ listenerId, error }) => console.warn(listenerId, error.message));
+```
+
+**Concurrency.** Emits are not queued: overlapping emits run their listeners interleaved, each with its own context. An emit keeps the listeners it started with; listeners added or removed during an emit only take effect on the next one. `event.stopPropagation()` skips the listeners that have not started yet.
+
+---
+
+## Cleanup
+
+```typescript
+const off = qk.on('user:login', handler);
+off();                              // remove this listener
+
+qk.off('user:login', handler);      // same, by reference
+qk.off('user:login');               // every listener of an event
+qk.offAll();                        // every listener
+
+// Remove several listeners at once with an AbortSignal
+const controller = new AbortController();
+qk.on('tick', onTick, { signal: controller.signal });
+qk.on('tock', onTock, { signal: controller.signal });
+controller.abort();
+
+// From inside a listener
+qk.on('job:progress', (e, ctx) => {
+  if (e.data.done) ctx.off();
+});
+
+// Run only once
+qk.on('app:ready', init, { once: true });
+```
+
+---
+
+## Promises
+
+```typescript
+import { createMachine } from '@quazardous/quarkernel/fsm';
+
+// Next occurrence of an event (rejects after the timeout)
+const login = await qk.once('user:login', { timeout: 5000 });
+console.log(login.data);
+
+// A combination of events
+const ready = qk.when(['user:ready', 'config:ready']);
+const { data } = await ready.once({ timeout: 5000 });
+ready.dispose();
+
+// A state machine reaching a state
+const order = createMachine({ /* ... */ });
+const { from, context } = await order.waitFor('confirmed', { timeout: 10000 });
+```
+
+---
+
+## State Machines (optional)
+
+Need explicit states on top of events? The optional `@quazardous/quarkernel/fsm` entry adds finite state machines built on the kernel, using an XState-compatible config. It is a separate import: it adds nothing to your bundle unless you use it.
 
 ```typescript
 import { createMachine } from '@quazardous/quarkernel/fsm';
@@ -128,30 +203,18 @@ import { createMachine } from '@quazardous/quarkernel/fsm';
 const order = createMachine({
   id: 'order',
   initial: 'draft',
-  context: { items: 0 },
   states: {
     draft: { on: { SUBMIT: 'pending' } },
     pending: { on: { APPROVE: 'confirmed', REJECT: 'draft' } },
-    confirmed: { on: { SHIP: 'shipped' } },
-    shipped: {}
-  },
-  onEnter: {
-    confirmed: (ctx, { log }) => log('Order confirmed!')
-  },
-  on: {
-    SUBMIT: (ctx, { set }) => set({ submittedAt: Date.now() })
+    confirmed: {}
   }
 });
 
-order.send('SUBMIT');
+await order.send('SUBMIT');
 console.log(order.state); // 'pending'
 ```
 
-**Features:**
-- XState import/export (`fromXState`, `toXState`)
-- Behavior helpers: `set()`, `send()`, `log()`
-- Auto-timers for delayed transitions
-- Visual debugging with [FSM Studio](https://quazardous.github.io/quarkernel/fsm-studio/)
+Behavior helpers, auto-timers and XState import/export are covered in [Async Patterns](./docs/async-patterns.md) and [Advanced Patterns](./docs/advanced-qk.md). Try machines visually in [FSM Studio](https://quazardous.github.io/quarkernel/fsm-studio/).
 
 ---
 
@@ -193,6 +256,8 @@ npm install @quazardous/quarkernel @quazardous/quarkernel-svelte
 **Resources:**
 - [Benchmarks](./benchmarks/README.md) - Performance comparisons
 - [Demos](./demos/README.md) - Live examples
+- [Changelog](./CHANGELOG.md) - Release notes
+- [Contributing](./CONTRIBUTING.md) - Setup, tests and release process
 
 ---
 

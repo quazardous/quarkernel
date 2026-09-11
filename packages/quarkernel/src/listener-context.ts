@@ -10,6 +10,7 @@
  */
 
 import type { KernelEvent } from './kernel-event';
+import type { ExecutionError } from './types';
 
 /**
  * Context object passed to each listener callback.
@@ -98,9 +99,9 @@ export class ListenerContext {
 
   /**
    * Emits an event from within this listener.
-   * Delegates to kernel.emit().
+   * Delegates to kernel.emit() and resolves with the errors of that emit.
    */
-  emit = async <T = any>(eventName: string, data?: T): Promise<void> => {
+  emit = async <T = any>(eventName: string, data?: T): Promise<ReadonlyArray<ExecutionError>> => {
     return this.kernel.emit(eventName, data);
   };
 
@@ -122,7 +123,7 @@ export class ListenerContext {
  */
 export interface ListenerContextKernel {
   off(eventName: string, listener: Function): void;
-  emit<T = any>(eventName: string, data?: T): Promise<void>;
+  emit<T = any>(eventName: string, data?: T): Promise<ReadonlyArray<ExecutionError>>;
 }
 
 /**

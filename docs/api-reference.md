@@ -10,6 +10,7 @@ Complete API documentation for QuarKernel v2.
   - [KernelEvent](#kernelevent)
   - [ListenerContext](#listenercontext)
 - [Composition API](#composition-api)
+  - [kernel.when()](#kernelwhen)
   - [Kernel.compose()](#kernelcompose)
   - [Composition](#composition)
   - [Context Mergers](#context-mergers)
@@ -229,14 +230,14 @@ Emit an event and execute matching listeners level by level: listeners in the sa
 emit<K extends keyof Events>(
   event: K,
   data?: Events[K]
-): Promise<void>
+): Promise<ReadonlyArray<ExecutionError>>
 ```
 
 **Parameters:**
 - `event`: Event name to emit
 - `data` (optional): Event payload (typed based on EventMap)
 
-**Returns:** Promise that resolves when all listeners complete.
+**Returns:** Promise that resolves when all listeners complete, with the errors thrown by this emit's listeners (`{ listenerId, error, timestamp, eventName }`, empty when none failed). Each emit gets its own list, even when emits overlap. Listeners and `onError` see the same list as `event.errors`.
 
 **Throws:** `AggregateError` if any listeners fail and `errorBoundary: false`.
 
@@ -250,6 +251,10 @@ await qk.emit('user:login', {
 
 // Emit without data
 await qk.emit('app:ready');
+
+// Errors of this emit (errorBoundary: true)
+const errors = await qk.emit('user:login', data);
+errors.forEach(({ listenerId, error }) => console.warn(listenerId, error.message));
 
 // Handle errors
 try {
@@ -269,14 +274,16 @@ Emit an event and execute listeners sequentially (one after another) instead of 
 emitSerial<K extends keyof Events>(
   event: K,
   data?: Events[K]
-): Promise<void>
+): Promise<ReadonlyArray<ExecutionError>>
 ```
 
 **Parameters:**
 - `event`: Event name to emit
 - `data` (optional): Event payload
 
-**Returns:** Promise that resolves when all listeners complete sequentially.
+**Returns:** Promise that resolves when all listeners complete sequentially, with the errors thrown by its listeners (same as `emit()`).
+
+**Throws:** the first listener error, without running the remaining listeners, when `errorBoundary: false`.
 
 **Example:**
 ```typescript
@@ -362,7 +369,7 @@ qk.debug(false); // Disable debug logging
 
 ##### getExecutionErrors()
 
-Get errors collected during the last event emission (when `errorBoundary: true`).
+Legacy: get the errors collected since the kernel was last idle. The list is reset when an emit starts while no other emit is running, so overlapping and nested emits add to it instead of wiping each other's errors. Prefer the value returned by `emit()` / `emitSerial()`, which only contains the errors of that emit.
 
 **Signature:**
 ```typescript
@@ -417,6 +424,7 @@ Event object passed to listeners.
 | `context` | `Record<string, any>` | Shared mutable context for passing data between listeners (readonly reference, but object is mutable) |
 | `timestamp` | `number` | Event creation timestamp in milliseconds (readonly) |
 | `isPropagationStopped` | `boolean` | Whether propagation was stopped (readonly) |
+| `errors` | `ReadonlyArray<ExecutionError>` | Errors thrown by listeners of this emit so far (readonly). The same list `emit()` resolves with |
 
 **Methods:**
 
@@ -525,6 +533,37 @@ qk.on('user:login', async (event, ctx) => {
 ---
 
 ## Composition API
+
+### kernel.when()
+
+Instance method to react to a combination of events on a single kernel. Shorthand for `new Composition([[kernel, event1], [kernel, event2], ...], options)`. To combine events from several kernels, use [`Composition`](#composition) or [`Kernel.compose()`](#kernelcompose).
+
+**Signature:**
+```typescript
+when(eventNames: Array<keyof Events>, options?: CompositionOptions): Composition
+```
+
+**Parameters:**
+- `eventNames`: Events that must all fire (in any order) before the composite event fires. Throws if empty.
+- `options` (optional): [`CompositionOptions`](#compositionoptions)
+
+**Returns:** `Composition` subscribed to this kernel. It stays subscribed, including after `once()` resolves, until `dispose()` is called.
+
+**Example:**
+```typescript
+const checkout = qk.when(['cart:ready', 'payment:confirmed']);
+
+checkout.onComposed((event) => {
+  console.log('Merged context:', event.data.merged);
+});
+
+// Promise form
+const ready = qk.when(['user:ready', 'config:ready']);
+const event = await ready.once({ timeout: 5000 });
+ready.dispose(); // unsubscribe from the kernel
+```
+
+---
 
 ### Kernel.compose()
 

@@ -213,7 +213,7 @@ describe('Kernel.compose()', () => {
       composition.onComposed(listener);
 
       // Should not throw due to error boundary
-      await expect(errorKernel.emit('error:test', { id: 1 })).resolves.toBeUndefined();
+      await expect(errorKernel.emit('error:test', { id: 1 })).resolves.toHaveLength(1);
       await profileKernel.emit('profile:loaded', { bio: 'test' });
 
       expect(errorHandler).toHaveBeenCalled();

@@ -312,7 +312,7 @@ describe('Kernel.emitSerial() - Sequential execution (T119)', () => {
 
       await expect(
         kernel.emitSerial('test:serial', { value: 1 })
-      ).resolves.toBeUndefined();
+      ).resolves.toEqual([]);
     });
 
     it('should handle single listener', async () => {
